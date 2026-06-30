@@ -201,7 +201,7 @@
       font-size: 13px;
     }
 
-    select, input[type="time"], input[type="text"] {
+    select, input[type="time"], input[type="text"], input[type="number"] {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 12px;
@@ -252,6 +252,41 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+    }
+
+    .mini-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .toggle-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .toggle-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    @media (max-width: 720px) {
+      .mini-grid-3 { grid-template-columns: 1fr; }
     }
 
     .hint {
@@ -501,9 +536,36 @@
         </div>
 
         <div>
-          <p class="small-note">
-            通常利用では、CSVを読み込んでこの3項目だけ確認すればExcelを生成できます。列マッピングやイベント定義などの詳細設定は右上の歯車アイコンから変更できます。
-          </p>
+          <div class="mini-grid-3">
+            <label class="field">時間バケット幅
+              <select id="bucketMinutes">
+                <option value="30">30分</option>
+                <option value="60" selected>1時間</option>
+                <option value="120">2時間</option>
+                <option value="180">3時間</option>
+                <option value="360">6時間</option>
+                <option value="720">12時間</option>
+                <option value="1440">24時間</option>
+              </select>
+            </label>
+            <label class="field">バケット上限
+              <input id="bucketMaxHours" type="number" min="1" step="1" value="24" />
+            </label>
+            <label class="field">初回対応比較ライン
+              <input id="responseThresholdHours" type="number" min="0.1" step="0.5" value="3" />
+            </label>
+          </div>
+          <p class="hint">例：幅1時間・上限24時間なら「0～1時間」「1～2時間」…「24時間超」に区切ります。比較ラインは「3時間以内 / 3時間超」などの率比較に使います。</p>
+          <div class="toggle-list">
+            <label class="toggle-row">
+              <span>応募者名を匿名化して出力</span>
+              <input id="anonymizeApplicants" type="checkbox" checked />
+            </label>
+            <label class="toggle-row">
+              <span>更新ユーザー名を匿名化して出力</span>
+              <input id="anonymizeUsers" type="checkbox" />
+            </label>
+          </div>
           <div id="quickStatus" class="meta">CSV読み込み後に生成できます。</div>
         </div>
       </div>
@@ -634,6 +696,11 @@
       weekdayBoxes: document.getElementById('weekdayBoxes'),
       bizStart: document.getElementById('bizStart'),
       bizEnd: document.getElementById('bizEnd'),
+      bucketMinutes: document.getElementById('bucketMinutes'),
+      bucketMaxHours: document.getElementById('bucketMaxHours'),
+      responseThresholdHours: document.getElementById('responseThresholdHours'),
+      anonymizeApplicants: document.getElementById('anonymizeApplicants'),
+      anonymizeUsers: document.getElementById('anonymizeUsers'),
       useFallback: document.getElementById('useFallback'),
       interviewStatuses: document.getElementById('interviewStatuses'),
       offerStatuses: document.getElementById('offerStatuses'),
@@ -855,10 +922,22 @@
       if (!start || !end) throw new Error('営業時間の形式が不正です。');
       if (timeToMinutes(end) <= timeToMinutes(start)) throw new Error('営業終了は営業開始より後にしてください。');
 
+      const bucketMinutes = Number(els.bucketMinutes.value || 60);
+      const bucketMaxHours = Number(els.bucketMaxHours.value || 24);
+      const responseThresholdHours = Number(els.responseThresholdHours.value || 3);
+      if (!Number.isFinite(bucketMinutes) || bucketMinutes <= 0) throw new Error('時間バケット幅が不正です。');
+      if (!Number.isFinite(bucketMaxHours) || bucketMaxHours <= 0) throw new Error('バケット上限が不正です。');
+      if (!Number.isFinite(responseThresholdHours) || responseThresholdHours <= 0) throw new Error('初回対応比較ラインが不正です。');
+
       return {
         offDays,
         bizStart: start,
         bizEnd: end,
+        bucketMinutes,
+        bucketMaxMinutes: Math.round(bucketMaxHours * 60),
+        responseThresholdMinutes: Math.round(responseThresholdHours * 60),
+        anonymizeApplicants: els.anonymizeApplicants.checked,
+        anonymizeUsers: els.anonymizeUsers.checked,
         useFallback: els.useFallback.value === 'true',
         interviewSet: toStatusSet(els.interviewStatuses.value),
         offerSet: toStatusSet(els.offerStatuses.value),
@@ -873,7 +952,8 @@
       const log = createLog();
       const normalizedRows = normalizeRows(state.rows, mapping, settings, log);
       const groups = groupByApplicant(normalizedRows, log);
-      const result = buildResults(groups, settings, log);
+      const rawResult = buildResults(groups, settings, log);
+      const result = applyAnonymization(rawResult, settings, log);
 
       state.result = result;
       state.workbook = createWorkbook(result, mapping, settings, log);
@@ -900,6 +980,8 @@
         exactEvents: 0,
         fallbackEvents: 0,
         negativeDurationEvents: 0,
+        anonymizedApplicants: 0,
+        anonymizedUsers: 0,
         warnings: []
       };
     }
@@ -1121,8 +1203,10 @@
         '変更後ステータス': toStatus,
         '経過分_全時間': elapsedAll,
         '経過時間_全時間': minutesToDisplay(elapsedAll),
+        '経過時間バケット_全時間': durationBucket(elapsedAll, settings),
         '経過分_営業時間内': elapsedBiz,
         '経過時間_営業時間内': minutesToDisplay(elapsedBiz),
+        '経過時間バケット_営業時間内': durationBucket(elapsedBiz, settings),
         'イベント日_非稼働日フラグ': eventTiming.isOffDay ? 1 : 0,
         'イベント日_営業時間内フラグ': eventTiming.isBusinessTime ? 1 : 0,
         'イベントタイミング区分': eventTiming.category,
@@ -1153,8 +1237,16 @@
         '初回アクション更新ユーザー名': firstAction ? firstAction['更新ユーザー名'] : '',
         '初回アクション経過分_全時間': firstAction ? firstAction['経過分_全時間'] : '',
         '初回アクション経過時間_全時間': firstAction ? firstAction['経過時間_全時間'] : '',
+        '初回アクション時間バケット_全時間': firstAction ? firstAction['経過時間バケット_全時間'] : '未対応',
+        '初回対応速度グループ_全時間': speedGroup(firstAction ? firstAction['経過分_全時間'] : '', settings),
+        '初回対応比較ライン以内フラグ_全時間': isWithinThreshold(firstAction ? firstAction['経過分_全時間'] : '', settings),
         '初回アクション経過分_営業時間内': firstAction ? firstAction['経過分_営業時間内'] : '',
         '初回アクション経過時間_営業時間内': firstAction ? firstAction['経過時間_営業時間内'] : '',
+        '初回アクション時間バケット_営業時間内': firstAction ? firstAction['経過時間バケット_営業時間内'] : '未対応',
+        '初回対応速度グループ_営業時間内': speedGroup(firstAction ? firstAction['経過分_営業時間内'] : '', settings),
+        '初回対応比較ライン以内フラグ_営業時間内': isWithinThreshold(firstAction ? firstAction['経過分_営業時間内'] : '', settings),
+        '初回対応比較ライン_分': settings.responseThresholdMinutes,
+        '初回対応比較ライン': durationShort(settings.responseThresholdMinutes),
         '初回アクション判定方式': firstAction ? firstAction['判定方式'] : '',
         '面接以上有無': interview ? 1 : 0,
         '面接以上日時': interview ? interview['イベント日時'] : '',
@@ -1180,7 +1272,12 @@
         '履歴行数': rows.length,
         '集計設定_非稼働曜日': offDayLabels(settings).join(','),
         '集計設定_営業開始': timeObjectToString(settings.bizStart),
-        '集計設定_営業終了': timeObjectToString(settings.bizEnd)
+        '集計設定_営業終了': timeObjectToString(settings.bizEnd),
+        '集計設定_時間バケット幅': durationShort(settings.bucketMinutes),
+        '集計設定_バケット上限': durationShort(settings.bucketMaxMinutes),
+        '集計設定_初回対応比較ライン': durationShort(settings.responseThresholdMinutes),
+        '集計設定_応募者匿名化': settings.anonymizeApplicants ? 'ON' : 'OFF',
+        '集計設定_更新ユーザー匿名化': settings.anonymizeUsers ? 'ON' : 'OFF'
       };
     }
 
@@ -1190,6 +1287,7 @@
       appendSheet(wb, '02_ピボット用イベント', result.events);
       appendSheet(wb, '03_集計設定', buildSettingsSheet(mapping, settings));
       appendSheet(wb, '04_処理ログ・注意点', buildLogSheet(log));
+      appendSheet(wb, '05_初回対応速度別集計', buildSpeedSummarySheet(result.summaries));
       return wb;
     }
 
@@ -1212,6 +1310,11 @@
         { '項目': '非稼働曜日', '値': offDayLabels(settings).join(','), '補足': '' },
         { '項目': '営業開始', '値': timeObjectToString(settings.bizStart), '補足': '' },
         { '項目': '営業終了', '値': timeObjectToString(settings.bizEnd), '補足': '' },
+        { '項目': '時間バケット幅', '値': durationShort(settings.bucketMinutes), '補足': '経過時間バケット列の区切り幅' },
+        { '項目': 'バケット上限', '値': durationShort(settings.bucketMaxMinutes), '補足': '上限を超えた場合は「上限超」表記' },
+        { '項目': '初回対応比較ライン', '値': durationShort(settings.responseThresholdMinutes), '補足': '速度別集計の「以内 / 超」判定に使用' },
+        { '項目': '応募者名匿名化', '値': settings.anonymizeApplicants ? 'ON' : 'OFF', '補足': 'ONの場合、応募者000001形式に置換' },
+        { '項目': '更新ユーザー名匿名化', '値': settings.anonymizeUsers ? 'ON' : 'OFF', '補足': 'ONの場合、ユーザー000001形式に置換' },
         { '項目': '旧データfallback判定', '値': settings.useFallback ? '使う' : '使わない', '補足': '対応内容にステータス遷移が無い場合、対応ステータス名から推定' },
         { '項目': '未対応ステータス', '値': settings.untouched, '補足': '' },
         { '項目': '面接以上ステータス', '値': Array.from(settings.interviewSet).join(','), '補足': '' },
@@ -1234,10 +1337,109 @@
         { '項目': '対応状態変更の抽出件数', '値': log.exactTransitions, '補足': '対応内容から変更前/変更後を抽出できた件数' },
         { '項目': 'exactイベント件数', '値': log.exactEvents, '補足': '対応内容の変更前/変更後から判定' },
         { '項目': 'fallbackイベント件数', '値': log.fallbackEvents, '補足': '対応ステータス名から推定' },
-        { '項目': '負の経過時間イベント件数', '値': log.negativeDurationEvents, '補足': '対応日付が応募日付より前の可能性' }
+        { '項目': '負の経過時間イベント件数', '値': log.negativeDurationEvents, '補足': '対応日付が応募日付より前の可能性' },
+        { '項目': '匿名化した応募者数', '値': log.anonymizedApplicants || 0, '補足': '応募者名匿名化ONの場合' },
+        { '項目': '匿名化した更新ユーザー数', '値': log.anonymizedUsers || 0, '補足': '更新ユーザー名匿名化ONの場合' }
       ];
       log.warnings.forEach((w, i) => rows.push({ '項目': `警告${i + 1}`, '値': w, '補足': '' }));
       return rows;
+    }
+
+
+    function buildSpeedSummarySheet(summaries) {
+      const axes = [
+        { axis: '全時間', key: '初回対応速度グループ_全時間' },
+        { axis: '営業時間内', key: '初回対応速度グループ_営業時間内' }
+      ];
+      const rows = [];
+      axes.forEach(axis => {
+        const map = new Map();
+        summaries.forEach(row => {
+          const group = row[axis.key] || '未対応';
+          if (!map.has(group)) {
+            map.set(group, { applications: 0, firstActions: 0, interviews: 0, offers: 0, hires: 0 });
+          }
+          const bucket = map.get(group);
+          bucket.applications += 1;
+          bucket.firstActions += Number(row['初回アクション有無'] || 0);
+          bucket.interviews += Number(row['面接以上有無'] || 0);
+          bucket.offers += Number(row['内定以上有無'] || 0);
+          bucket.hires += Number(row['採用以上有無'] || 0);
+        });
+        Array.from(map.entries()).forEach(([group, v]) => {
+          rows.push({
+            '判定時間軸': axis.axis,
+            '初回対応速度グループ': group,
+            '応募数': v.applications,
+            '初回アクション数': v.firstActions,
+            '面接以上数': v.interviews,
+            '面接率': rateText(v.interviews, v.applications),
+            '内定以上数': v.offers,
+            '内定率': rateText(v.offers, v.applications),
+            '採用以上数': v.hires,
+            '採用率': rateText(v.hires, v.applications)
+          });
+        });
+      });
+      return rows.length ? rows : [{ 'メッセージ': '該当データなし' }];
+    }
+
+    function applyAnonymization(result, settings, log) {
+      const applicantMap = new Map();
+      const userMap = new Map();
+      const summaries = result.summaries.map(row => ({ ...row }));
+      const events = result.events.map(row => ({ ...row }));
+
+      if (settings.anonymizeApplicants) {
+        const getApplicantId = (key) => {
+          const sourceKey = String(key || '');
+          if (!applicantMap.has(sourceKey)) applicantMap.set(sourceKey, `応募者${padNumber(applicantMap.size + 1, 6)}`);
+          return applicantMap.get(sourceKey);
+        };
+        summaries.forEach(row => anonymizeApplicantRow(row, getApplicantId));
+        events.forEach(row => anonymizeApplicantRow(row, getApplicantId));
+        log.anonymizedApplicants = applicantMap.size;
+      }
+
+      if (settings.anonymizeUsers) {
+        const getUserId = (name) => {
+          const sourceName = String(name || '').trim();
+          if (!sourceName) return '';
+          if (!userMap.has(sourceName)) userMap.set(sourceName, `ユーザー${padNumber(userMap.size + 1, 6)}`);
+          return userMap.get(sourceName);
+        };
+        summaries.forEach(row => anonymizeUserFields(row, getUserId));
+        events.forEach(row => anonymizeUserFields(row, getUserId));
+        log.anonymizedUsers = userMap.size;
+      }
+
+      return { summaries, events };
+    }
+
+    function anonymizeApplicantRow(row, getApplicantId) {
+      const originalKey = row['応募者キー'];
+      const anonId = getApplicantId(originalKey);
+      const applyMonth = row['応募月'] || '';
+      row['応募者キー'] = applyMonth ? `${applyMonth}_${anonId}` : anonId;
+      if ('応募者名' in row) row['応募者名'] = anonId;
+      if ('応募者名_正規化' in row) row['応募者名_正規化'] = anonId;
+    }
+
+    function anonymizeUserFields(row, getUserId) {
+      [
+        '更新ユーザー名',
+        '初回アクション更新ユーザー名',
+        '面接以上更新ユーザー名',
+        '内定以上更新ユーザー名',
+        '採用以上更新ユーザー名'
+      ].forEach(key => {
+        if (key in row) row[key] = getUserId(row[key]);
+      });
+    }
+
+    function rateText(numerator, denominator) {
+      if (!denominator) return '0.0%';
+      return `${((numerator / denominator) * 100).toFixed(1)}%`;
     }
 
     function renderResult(result, log) {
@@ -1482,6 +1684,56 @@
     }
 
     function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function durationBucket(minutes, settings) {
+      if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '未対応';
+      const n = Number(minutes);
+      if (n < 0) return '負の経過時間';
+      const width = settings.bucketMinutes || 60;
+      const max = settings.bucketMaxMinutes || 1440;
+      if (n >= max) return `${durationShort(max)}超`;
+      const start = Math.floor(n / width) * width;
+      const end = start + width;
+      return `${durationShort(start)}～${durationShort(end)}`;
+    }
+
+    function speedGroup(minutes, settings) {
+      if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '未対応';
+      const n = Number(minutes);
+      if (n < 0) return '負の経過時間';
+      const threshold = settings.responseThresholdMinutes || 180;
+      return n <= threshold ? `${durationShort(threshold)}以内` : `${durationShort(threshold)}超`;
+    }
+
+    function isWithinThreshold(minutes, settings) {
+      if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '';
+      const n = Number(minutes);
+      if (n < 0) return '';
+      return n <= (settings.responseThresholdMinutes || 180) ? 1 : 0;
+    }
+
+    function durationShort(minutes) {
+      if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '';
+      const n = Math.round(Number(minutes));
+      if (n === 0) return '0分';
+      if (n % 1440 === 0) return `${n / 1440}日`;
+      if (n >= 1440) {
+        const d = Math.floor(n / 1440);
+        const rest = n - d * 1440;
+        const h = Math.floor(rest / 60);
+        const m = rest - h * 60;
+        return `${d}日${h ? h + '時間' : ''}${m ? m + '分' : ''}`;
+      }
+      if (n % 60 === 0) return `${n / 60}時間`;
+      if (n > 60) {
+        const h = Math.floor(n / 60);
+        const m = n - h * 60;
+        return `${h}時間${m}分`;
+      }
+      return `${n}分`;
+    }
+
+    function padNumber(n, len) { return String(n).padStart(len, '0'); }
 
     function minutesToDisplay(minutes) {
       if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '';
