@@ -335,19 +335,138 @@
       color: var(--muted);
       margin: 0;
     }
+
+
+    .header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .header-copy { min-width: 0; }
+
+    .settings-icon-btn {
+      flex: 0 0 auto;
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      font-size: 22px;
+    }
+
+    .settings-icon-btn:hover {
+      background: #f8fafc;
+      transform: translateY(-1px) rotate(12deg);
+    }
+
+    .quick-actions {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, .58);
+      padding: 28px;
+      overflow: auto;
+    }
+
+    .config-modal {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 28px 80px rgba(15, 23, 42, .28);
+      border: 1px solid rgba(219, 227, 239, .96);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px 24px;
+      background: linear-gradient(180deg, #f8fafc, #ffffff);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-header h2 {
+      margin: 0 0 4px;
+      font-size: 22px;
+    }
+
+    .modal-close {
+      flex: 0 0 auto;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      background: #334155;
+      color: #ffffff;
+      font-size: 20px;
+      box-shadow: none;
+    }
+
+    .modal-body {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .modal-card {
+      min-width: 0;
+      max-width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #ffffff;
+      padding: 18px;
+    }
+
+    .modal-card h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .body-lock { overflow: hidden; }
+
+    @media (max-width: 720px) {
+      header { padding-top: 24px; }
+      .header-row { align-items: center; }
+      .settings-icon-btn { width: 42px; height: 42px; }
+      .modal-backdrop { padding: 12px; }
+      .modal-header, .modal-body { padding: 16px; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>応募対応履歴 ETL / Excel出力ツール</h1>
-    <p class="lead">
-      応募対応履歴CSVを読み込み、応募者単位のサマリーとピボット集計用イベントデータをExcelファイルとして出力します。処理はブラウザ内で完結し、ファイルはサーバーに送信されません。
-    </p>
+    <div class="header-row">
+      <div class="header-copy">
+        <h1>応募対応履歴 ETL / Excel出力ツール</h1>
+        <p class="lead">
+          応募対応履歴CSVを読み込み、応募者単位のサマリーとピボット集計用イベントデータをExcelファイルとして出力します。処理はブラウザ内で完結し、ファイルはサーバーに送信されません。
+        </p>
+      </div>
+      <button id="configBtn" class="settings-icon-btn" type="button" aria-label="設定を開く" title="設定・詳細カスタム">⚙</button>
+    </div>
   </header>
 
   <main>
     <section class="card">
-      <h2>1. CSVアップロード</h2>
+      <h2>CSVアップロード</h2>
       <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="CSVファイルを選択">
         <div>
           <strong>CSVをドラッグ＆ドロップ</strong>
@@ -358,16 +477,8 @@
       <div id="fileMeta" class="meta">未読み込み</div>
     </section>
 
-    <section id="mappingCard" class="card hidden">
-      <h2>2. 列マッピング確認</h2>
-      <p class="small-note">
-        列マッピングは、入力CSVの各列を「応募日付」「対応日付」「対応ステータス名」など、アプリ内部で使う役割に対応させるための設定です。出力列を選ぶためではありません。列名が標準と違うCSVでも、ここを合わせれば同じ処理で読み込めます。
-      </p>
-      <div id="mappingArea" class="mapping-grid"></div>
-    </section>
-
-    <section id="settingsCard" class="card hidden">
-      <h2>3. 集計条件設定</h2>
+    <section id="settingsCard" class="card">
+      <h2>集計条件設定</h2>
       <div class="settings-grid">
         <div>
           <label class="field">
@@ -390,53 +501,82 @@
         </div>
 
         <div>
-          <label class="field">
-            旧データの推定判定
-            <select id="useFallback">
-              <option value="true" selected>使う：対応ステータス名から推定</option>
-              <option value="false">使わない：対応内容の変更履歴だけ使う</option>
-            </select>
-          </label>
-          <p class="hint">対応内容に「対応状態をAからBに変更」が無い古いデータを扱うための設定です。</p>
+          <p class="small-note">
+            通常利用では、CSVを読み込んでこの3項目だけ確認すればExcelを生成できます。列マッピングやイベント定義などの詳細設定は右上の歯車アイコンから変更できます。
+          </p>
+          <div id="quickStatus" class="meta">CSV読み込み後に生成できます。</div>
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:18px;">
-        <label class="field">面接以上ステータス
-          <input id="interviewStatuses" type="text" value="面接確定,内定,採用,入社" />
-        </label>
-        <label class="field">内定以上ステータス
-          <input id="offerStatuses" type="text" value="内定,採用,入社" />
-        </label>
-        <label class="field">採用以上ステータス
-          <input id="hireStatuses" type="text" value="採用,入社" />
-        </label>
-        <label class="field">未対応ステータス名
-          <input id="untouchedStatus" type="text" value="未対応" />
-        </label>
-      </div>
-
-      <div class="toolbar">
-        <button id="processBtn" class="success" disabled>Excelを作成する</button>
+      <div class="toolbar quick-actions">
+        <button id="processBtn" class="success" disabled>Excelを生成・ダウンロード</button>
         <button id="resetBtn" class="secondary" type="button">リセット</button>
       </div>
     </section>
-
-    <section id="resultCard" class="card hidden">
-      <h2>4. 処理結果プレビュー</h2>
-      <div id="summaryPills" class="pill-row"></div>
-      <div class="toolbar">
-        <button id="downloadBtn" disabled>Excelをダウンロード</button>
-      </div>
-      <p class="small-note">プレビューは先頭100行までです。Excelには全件を書き出します。</p>
-      <div id="previewArea" class="preview" style="margin-top:12px;"></div>
-    </section>
-
-    <section id="logCard" class="card hidden">
-      <h2>処理ログ</h2>
-      <div id="logArea" class="log"></div>
-    </section>
   </main>
+
+  <div id="configModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+    <div class="config-modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="configTitle">設定・詳細カスタム</h2>
+          <p class="small-note">普段は触らなくてよい詳細設定です。入力CSVの列名が違う場合や、イベント定義を変更したい場合に使います。</p>
+        </div>
+        <button id="configCloseBtn" class="modal-close" type="button" aria-label="設定を閉じる">×</button>
+      </div>
+
+      <div class="modal-body">
+        <section id="mappingCard" class="modal-card hidden">
+          <h3>列マッピング確認</h3>
+          <p class="small-note">
+            列マッピングは、入力CSVの各列を「応募日付」「対応日付」「対応ステータス名」など、アプリ内部で使う役割に対応させるための設定です。出力列を選ぶためではありません。列名が標準と違うCSVでも、ここを合わせれば同じ処理で読み込めます。
+          </p>
+          <div id="mappingArea" class="mapping-grid" style="margin-top:12px;"></div>
+        </section>
+
+        <section id="advancedCard" class="modal-card">
+          <h3>イベント判定・旧データ対応</h3>
+          <div class="grid-2">
+            <label class="field">
+              旧データの推定判定
+              <select id="useFallback">
+                <option value="true" selected>使う：対応ステータス名から推定</option>
+                <option value="false">使わない：対応内容の変更履歴だけ使う</option>
+              </select>
+            </label>
+            <label class="field">未対応ステータス名
+              <input id="untouchedStatus" type="text" value="未対応" />
+            </label>
+            <label class="field">面接以上ステータス
+              <input id="interviewStatuses" type="text" value="面接確定,内定,採用,入社" />
+            </label>
+            <label class="field">内定以上ステータス
+              <input id="offerStatuses" type="text" value="内定,採用,入社" />
+            </label>
+            <label class="field">採用以上ステータス
+              <input id="hireStatuses" type="text" value="採用,入社" />
+            </label>
+          </div>
+          <p class="hint">対応内容に「対応状態をAからBに変更」が無い古いデータは、fallback判定を使うと対応ステータス名から推定します。</p>
+        </section>
+
+        <section id="resultCard" class="modal-card hidden">
+          <h3>処理結果プレビュー</h3>
+          <div id="summaryPills" class="pill-row"></div>
+          <div class="toolbar">
+            <button id="downloadBtn" disabled>Excelを再ダウンロード</button>
+          </div>
+          <p class="small-note">プレビューは先頭100行までです。Excelには全件を書き出します。</p>
+          <div id="previewArea" class="preview" style="margin-top:12px;"></div>
+        </section>
+
+        <section id="logCard" class="modal-card hidden">
+          <h3>処理ログ</h3>
+          <div id="logArea" class="log"></div>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <script>
     'use strict';
@@ -484,6 +624,10 @@
       dropzone: document.getElementById('dropzone'),
       fileInput: document.getElementById('fileInput'),
       fileMeta: document.getElementById('fileMeta'),
+      configBtn: document.getElementById('configBtn'),
+      configModal: document.getElementById('configModal'),
+      configCloseBtn: document.getElementById('configCloseBtn'),
+      quickStatus: document.getElementById('quickStatus'),
       mappingCard: document.getElementById('mappingCard'),
       mappingArea: document.getElementById('mappingArea'),
       settingsCard: document.getElementById('settingsCard'),
@@ -560,6 +704,25 @@
         window.XLSX.writeFile(state.workbook, state.outputName || 'etl_result.xlsx', { compression: true });
       });
       els.resetBtn.addEventListener('click', resetAll);
+      els.configBtn.addEventListener('click', openConfigModal);
+      els.configCloseBtn.addEventListener('click', closeConfigModal);
+      els.configModal.addEventListener('click', (ev) => {
+        if (ev.target === els.configModal) closeConfigModal();
+      });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && !els.configModal.classList.contains('hidden')) closeConfigModal();
+      });
+    }
+
+    function openConfigModal() {
+      els.configModal.classList.remove('hidden');
+      document.body.classList.add('body-lock');
+      els.configCloseBtn.focus();
+    }
+
+    function closeConfigModal() {
+      els.configModal.classList.add('hidden');
+      document.body.classList.remove('body-lock');
     }
 
     function renderWeekdayBoxes() {
@@ -607,6 +770,7 @@
       renderMappings();
       els.mappingCard.classList.remove('hidden');
       els.settingsCard.classList.remove('hidden');
+      els.quickStatus.textContent = state.rows.length ? 'CSV読み込み済みです。必要に応じて条件を確認し、Excelを生成できます。' : 'CSVにデータ行がありません。';
       els.processBtn.disabled = state.rows.length === 0;
       appendLog(`読み込み完了: ${state.rows.length}行 / ${state.headers.length}列`);
     }
@@ -719,6 +883,7 @@
       els.resultCard.classList.remove('hidden');
       els.downloadBtn.disabled = false;
       appendLog('Excel作成完了: ' + state.outputName);
+      window.XLSX.writeFile(state.workbook, state.outputName || 'etl_result.xlsx', { compression: true });
     }
 
     function createLog() {
@@ -1135,7 +1300,6 @@
       els.fileInput.value = '';
       els.fileMeta.textContent = '未読み込み';
       els.mappingCard.classList.add('hidden');
-      els.settingsCard.classList.add('hidden');
       els.resultCard.classList.add('hidden');
       els.processBtn.disabled = true;
       els.downloadBtn.disabled = true;
@@ -1144,6 +1308,8 @@
       els.summaryPills.innerHTML = '';
       els.logArea.textContent = '';
       els.logCard.classList.add('hidden');
+      els.quickStatus.textContent = 'CSV読み込み後に生成できます。';
+      closeConfigModal();
     }
 
     function resetResultOnly() {
