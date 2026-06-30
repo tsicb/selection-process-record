@@ -101,6 +101,35 @@
       .grid-2 { grid-template-columns: 1fr; }
     }
 
+    .upload-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .upload-panel {
+      min-width: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .upload-panel-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .upload-panel-title .optional {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 860px) {
+      .upload-grid { grid-template-columns: 1fr; }
+    }
+
     .dropzone {
       border: 2px dashed #a7b7d6;
       background: linear-gradient(180deg, #fff, #f8fbff);
@@ -618,18 +647,39 @@
   <main>
     <section class="card">
       <h2>CSVアップロード</h2>
-      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="CSVファイルを選択">
-        <div class="dropzone-inner">
-          <div id="dropzoneIcon" class="dropzone-icon">📄</div>
-          <div class="dropzone-copy">
-            <strong id="dropzoneTitle">CSVをドラッグ＆ドロップ</strong>
-            <span id="dropzoneSubtext">またはクリックしてファイルを選択</span>
+      <div class="upload-grid">
+        <div class="upload-panel">
+          <p class="upload-panel-title">応募者情報CSV <span class="optional">推奨・母集団用</span></p>
+          <div id="applicantDropzone" class="dropzone" tabindex="0" role="button" aria-label="応募者情報CSVファイルを選択">
+            <div class="dropzone-inner">
+              <div id="applicantDropzoneIcon" class="dropzone-icon">👥</div>
+              <div class="dropzone-copy">
+                <strong id="applicantDropzoneTitle">応募者情報CSVをドラッグ＆ドロップ</strong>
+                <span id="applicantDropzoneSubtext">任意。入れると未対応応募者も含めて集計します</span>
+              </div>
+              <div id="applicantDropzoneLoadedMeta" class="dropzone-loaded-meta hidden"></div>
+            </div>
           </div>
-          <div id="dropzoneLoadedMeta" class="dropzone-loaded-meta hidden"></div>
+          <input id="applicantFileInput" class="hidden" type="file" accept=".csv,text/csv" />
+          <div id="applicantFileMeta" class="meta hidden" aria-hidden="true">未読み込み</div>
+        </div>
+
+        <div class="upload-panel">
+          <p class="upload-panel-title">対応履歴CSV <span class="optional">必須・アクション履歴用</span></p>
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="対応履歴CSVファイルを選択">
+            <div class="dropzone-inner">
+              <div id="dropzoneIcon" class="dropzone-icon">📄</div>
+              <div class="dropzone-copy">
+                <strong id="dropzoneTitle">対応履歴CSVをドラッグ＆ドロップ</strong>
+                <span id="dropzoneSubtext">またはクリックしてファイルを選択</span>
+              </div>
+              <div id="dropzoneLoadedMeta" class="dropzone-loaded-meta hidden"></div>
+            </div>
+          </div>
+          <input id="fileInput" class="hidden" type="file" accept=".csv,text/csv" />
+          <div id="fileMeta" class="meta hidden" aria-hidden="true">未読み込み</div>
         </div>
       </div>
-      <input id="fileInput" class="hidden" type="file" accept=".csv,text/csv" />
-      <div id="fileMeta" class="meta">未読み込み</div>
     </section>
 
     <section id="settingsCard" class="card">
@@ -712,8 +762,16 @@
       </div>
 
       <div class="modal-body">
+        <section id="applicantMappingCard" class="modal-card hidden">
+          <h3>応募者情報CSV 列マッピング確認</h3>
+          <p class="small-note">
+            応募者情報CSVは、全応募者の母集団と属性情報を補うために使います。入っている場合は、このCSVを基準に未対応応募者も含めて集計します。
+          </p>
+          <div id="applicantMappingArea" class="mapping-grid" style="margin-top:12px;"></div>
+        </section>
+
         <section id="mappingCard" class="modal-card hidden">
-          <h3>列マッピング確認</h3>
+          <h3>対応履歴CSV 列マッピング確認</h3>
           <p class="small-note">
             列マッピングは、入力CSVの各列を「応募日付」「対応日付」「対応ステータス名」など、アプリ内部で使う役割に対応させるための設定です。出力列を選ぶためではありません。列名が標準と違うCSVでも、ここを合わせれば同じ処理で読み込めます。
           </p>
@@ -768,11 +826,20 @@
     'use strict';
 
     const state = {
+      // 対応履歴CSV（従来のメインCSV）
       file: null,
       encoding: '',
       text: '',
       headers: [],
       rows: [],
+
+      // 応募者情報CSV（任意。存在する場合はこちらを母集団にする）
+      applicantFile: null,
+      applicantEncoding: '',
+      applicantText: '',
+      applicantHeaders: [],
+      applicantRows: [],
+
       result: null,
       workbook: null,
       outputName: ''
@@ -796,6 +863,19 @@
       { key: 'category', label: '区分列', required: false, candidates: ['区分', '種別'] }
     ];
 
+    const applicantMappingDefs = [
+      { key: 'applyDate', label: '応募日時列', required: true, candidates: ['応募日時', '応募日付', '応募日'] },
+      { key: 'applicantName', label: '氏名列', required: true, candidates: ['氏名', '応募者名', '応募者氏名', '名前'] },
+      { key: 'jobNo', label: '仕事番号列', required: false, candidates: ['お仕事NO', 'お仕事No', '仕事番号', '求人番号', '管理番号'] },
+      { key: 'jobTitle', label: '仕事名列', required: false, candidates: ['仕事名', '求人名', '職種名', 'タイトル'] },
+      { key: 'age', label: '年齢列', required: false, candidates: ['年齢', '応募者年齢'] },
+      { key: 'media', label: '応募媒体列', required: false, candidates: ['応募媒体', '媒体', '流入元'] },
+      { key: 'workplaceName', label: '勤務場所名列', required: false, candidates: ['勤務地名1', '勤務地名', '勤務場所名', '拠点名'] },
+      { key: 'workplaceAddress', label: '勤務所在地列', required: false, candidates: ['勤務地1', '勤務地', '勤務所在地', '住所'] },
+      { key: 'jobCategory', label: '職種分類列', required: false, candidates: ['職種', '職種分類', '職種カテゴリ'] },
+      { key: 'description', label: '仕事内容列', required: false, candidates: ['仕事内容', '業務内容'] }
+    ];
+
     const weekdays = [
       { label: '日', value: 0 },
       { label: '月', value: 1 },
@@ -807,6 +887,13 @@
     ];
 
     const els = {
+      applicantDropzone: document.getElementById('applicantDropzone'),
+      applicantDropzoneIcon: document.getElementById('applicantDropzoneIcon'),
+      applicantDropzoneTitle: document.getElementById('applicantDropzoneTitle'),
+      applicantDropzoneSubtext: document.getElementById('applicantDropzoneSubtext'),
+      applicantDropzoneLoadedMeta: document.getElementById('applicantDropzoneLoadedMeta'),
+      applicantFileInput: document.getElementById('applicantFileInput'),
+      applicantFileMeta: document.getElementById('applicantFileMeta'),
       dropzone: document.getElementById('dropzone'),
       dropzoneIcon: document.getElementById('dropzoneIcon'),
       dropzoneTitle: document.getElementById('dropzoneTitle'),
@@ -818,6 +905,8 @@
       configModal: document.getElementById('configModal'),
       configCloseBtn: document.getElementById('configCloseBtn'),
       quickStatus: document.getElementById('quickStatus'),
+      applicantMappingCard: document.getElementById('applicantMappingCard'),
+      applicantMappingArea: document.getElementById('applicantMappingArea'),
       mappingCard: document.getElementById('mappingCard'),
       mappingArea: document.getElementById('mappingArea'),
       settingsCard: document.getElementById('settingsCard'),
@@ -849,7 +938,8 @@
     function init() {
       renderWeekdayBoxes();
       bindEvents();
-      setDropzoneIdle();
+      setHistoryDropzoneIdle();
+      setApplicantDropzoneIdle();
       const missing = requiredLibs.filter(([, getter]) => !getter()).map(([name]) => name);
       if (missing.length) {
         appendLog('ライブラリ読み込みに失敗しました: ' + missing.join(', '));
@@ -858,33 +948,8 @@
     }
 
     function bindEvents() {
-      els.dropzone.addEventListener('click', () => els.fileInput.click());
-      els.dropzone.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') els.fileInput.click();
-      });
-      els.fileInput.addEventListener('change', (ev) => {
-        const file = ev.target.files && ev.target.files[0];
-        if (file) loadFile(file);
-      });
-
-      ['dragenter', 'dragover'].forEach(type => {
-        els.dropzone.addEventListener(type, (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          els.dropzone.classList.add('dragover');
-        });
-      });
-      ['dragleave', 'drop'].forEach(type => {
-        els.dropzone.addEventListener(type, (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          els.dropzone.classList.remove('dragover');
-        });
-      });
-      els.dropzone.addEventListener('drop', (ev) => {
-        const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
-        if (file) loadFile(file);
-      });
+      bindUploadZone(els.dropzone, els.fileInput, loadFile);
+      bindUploadZone(els.applicantDropzone, els.applicantFileInput, loadApplicantFile);
 
       els.processBtn.addEventListener('click', () => {
         try {
@@ -931,22 +996,51 @@
       });
     }
 
-    function setDropzoneIdle() {
-      els.dropzone.classList.remove('is-loaded');
-      els.dropzoneIcon.textContent = '📄';
-      els.dropzoneTitle.textContent = 'CSVをドラッグ＆ドロップ';
-      els.dropzoneSubtext.textContent = 'またはクリックしてファイルを選択';
-      els.dropzoneLoadedMeta.classList.add('hidden');
-      els.dropzoneLoadedMeta.innerHTML = '';
+    function bindUploadZone(zone, input, loader) {
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') input.click();
+      });
+      input.addEventListener('change', (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        if (file) loader(file);
+      });
+      ['dragenter', 'dragover'].forEach(type => {
+        zone.addEventListener(type, (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          zone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(type => {
+        zone.addEventListener(type, (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          zone.classList.remove('dragover');
+        });
+      });
+      zone.addEventListener('drop', (ev) => {
+        const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+        if (file) loader(file);
+      });
     }
 
-    function setDropzoneLoaded(file, encoding, rowCount, colCount) {
-      els.dropzone.classList.add('is-loaded');
-      els.dropzoneIcon.textContent = '✓';
-      els.dropzoneTitle.textContent = 'CSVを読み込み済みです';
-      els.dropzoneSubtext.textContent = '別ファイルを使う場合は、この枠をクリックまたはドラッグ＆ドロップしてください。';
-      els.dropzoneLoadedMeta.classList.remove('hidden');
-      els.dropzoneLoadedMeta.innerHTML = [
+    function setDropzoneIdle(zone, icon, title, subtext, meta, iconText, titleText, subtextText) {
+      zone.classList.remove('is-loaded');
+      icon.textContent = iconText;
+      title.textContent = titleText;
+      subtext.textContent = subtextText;
+      meta.classList.add('hidden');
+      meta.innerHTML = '';
+    }
+
+    function setDropzoneLoaded(zone, icon, title, subtext, meta, file, encoding, rowCount, colCount, label) {
+      zone.classList.add('is-loaded');
+      icon.textContent = '✓';
+      title.textContent = `${label}を読み込み済みです`;
+      subtext.textContent = '別ファイルを使う場合は、この枠をクリックまたはドラッグ＆ドロップしてください。';
+      meta.classList.remove('hidden');
+      meta.innerHTML = [
         `<span class="file-badge file-name">📎 ${escapeHtml(file.name || '')}</span>`,
         `<span class="file-badge">${escapeHtml(formatFileSize(file.size || 0))}</span>`,
         `<span class="file-badge">${escapeHtml(encoding)}</span>`,
@@ -954,45 +1048,88 @@
       ].join('');
     }
 
+    function setHistoryDropzoneIdle() {
+      setDropzoneIdle(els.dropzone, els.dropzoneIcon, els.dropzoneTitle, els.dropzoneSubtext, els.dropzoneLoadedMeta, '📄', '対応履歴CSVをドラッグ＆ドロップ', 'またはクリックしてファイルを選択');
+    }
+
+    function setApplicantDropzoneIdle() {
+      setDropzoneIdle(els.applicantDropzone, els.applicantDropzoneIcon, els.applicantDropzoneTitle, els.applicantDropzoneSubtext, els.applicantDropzoneLoadedMeta, '👥', '応募者情報CSVをドラッグ＆ドロップ', '任意。入れると未対応応募者も含めて集計します');
+    }
+
     async function loadFile(file) {
       resetResultOnly();
       state.file = file;
-      appendLog('読み込み開始: ' + file.name);
+      appendLog('対応履歴CSV 読み込み開始: ' + file.name);
 
+      const parsed = await readCsvFile(file);
+      state.encoding = parsed.encoding;
+      state.text = parsed.text;
+      state.headers = parsed.headers;
+      state.rows = parsed.rows;
+
+      els.fileMeta.textContent = buildFileMetaText(file, parsed.encoding, parsed.rows.length, parsed.headers.length);
+      renderMappings();
+      els.mappingCard.classList.remove('hidden');
+      els.settingsCard.classList.remove('hidden');
+      els.quickStatus.textContent = buildQuickStatusText();
+      els.processBtn.disabled = state.rows.length === 0;
+      setDropzoneLoaded(els.dropzone, els.dropzoneIcon, els.dropzoneTitle, els.dropzoneSubtext, els.dropzoneLoadedMeta, file, parsed.encoding, parsed.rows.length, parsed.headers.length, '対応履歴CSV');
+      appendLog(`対応履歴CSV 読み込み完了: ${parsed.rows.length}行 / ${parsed.headers.length}列`);
+    }
+
+    async function loadApplicantFile(file) {
+      resetResultOnly();
+      state.applicantFile = file;
+      appendLog('応募者情報CSV 読み込み開始: ' + file.name);
+
+      const parsed = await readCsvFile(file);
+      state.applicantEncoding = parsed.encoding;
+      state.applicantText = parsed.text;
+      state.applicantHeaders = parsed.headers;
+      state.applicantRows = parsed.rows;
+
+      els.applicantFileMeta.textContent = buildFileMetaText(file, parsed.encoding, parsed.rows.length, parsed.headers.length);
+      renderApplicantMappings();
+      els.applicantMappingCard.classList.remove('hidden');
+      els.settingsCard.classList.remove('hidden');
+      els.quickStatus.textContent = buildQuickStatusText();
+      setDropzoneLoaded(els.applicantDropzone, els.applicantDropzoneIcon, els.applicantDropzoneTitle, els.applicantDropzoneSubtext, els.applicantDropzoneLoadedMeta, file, parsed.encoding, parsed.rows.length, parsed.headers.length, '応募者情報CSV');
+      appendLog(`応募者情報CSV 読み込み完了: ${parsed.rows.length}行 / ${parsed.headers.length}列`);
+    }
+
+    async function readCsvFile(file) {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const detected = detectEncoding(bytes);
-      const text = decodeBytes(bytes, detected);
-      state.encoding = detected;
-      state.text = text.replace(/^\uFEFF/, '');
-
-      const parsed = window.Papa.parse(state.text, {
+      const encoding = detectEncoding(bytes);
+      const text = decodeBytes(bytes, encoding).replace(/^\uFEFF/, '');
+      const parsed = window.Papa.parse(text, {
         header: true,
         skipEmptyLines: 'greedy',
         transformHeader: h => String(h || '').replace(/^\uFEFF/, '').trim()
       });
-
       if (parsed.errors && parsed.errors.length) {
         appendLog('CSVパース警告: ' + parsed.errors.slice(0, 5).map(e => e.message).join(' / '));
       }
+      const headers = parsed.meta.fields || [];
+      const rows = (parsed.data || []).filter(row => Object.values(row).some(v => String(v || '').trim() !== ''));
+      return { encoding, text, headers, rows };
+    }
 
-      state.headers = parsed.meta.fields || [];
-      state.rows = (parsed.data || []).filter(row => Object.values(row).some(v => String(v || '').trim() !== ''));
-
-      els.fileMeta.textContent = [
+    function buildFileMetaText(file, encoding, rowCount, colCount) {
+      return [
         `ファイル名: ${file.name}`,
         `サイズ: ${formatFileSize(file.size)}`,
-        `推定文字コード: ${detected}`,
-        `列数: ${state.headers.length}`,
-        `データ行数: ${state.rows.length}`
+        `推定文字コード: ${encoding}`,
+        `列数: ${colCount}`,
+        `データ行数: ${rowCount}`
       ].join('\n');
+    }
 
-      renderMappings();
-      els.mappingCard.classList.remove('hidden');
-      els.settingsCard.classList.remove('hidden');
-      els.quickStatus.textContent = state.rows.length ? 'CSV読み込み済みです。必要に応じて条件を確認し、Excelを生成できます。' : 'CSVにデータ行がありません。';
-      els.processBtn.disabled = state.rows.length === 0;
-      setDropzoneLoaded(file, detected, state.rows.length, state.headers.length);
-      appendLog(`読み込み完了: ${state.rows.length}行 / ${state.headers.length}列`);
+    function buildQuickStatusText() {
+      const parts = [];
+      if (state.applicantRows.length) parts.push(`応募者情報CSV ${state.applicantRows.length}行`);
+      if (state.rows.length) parts.push(`対応履歴CSV ${state.rows.length}行`);
+      if (!state.rows.length) return '対応履歴CSVを読み込むと生成できます。応募者情報CSVは任意ですが、入れると未対応応募者も含められます。';
+      return `${parts.join(' / ')}。必要に応じて条件を確認し、Excelを生成できます。`;
     }
 
     function detectEncoding(bytes) {
@@ -1018,41 +1155,49 @@
     }
 
     function renderMappings() {
-      els.mappingArea.innerHTML = '';
-      mappingDefs.forEach(def => {
+      renderMappingArea(els.mappingArea, mappingDefs, state.headers, 'historyMapKey');
+    }
+
+    function renderApplicantMappings() {
+      renderMappingArea(els.applicantMappingArea, applicantMappingDefs, state.applicantHeaders, 'applicantMapKey');
+    }
+
+    function renderMappingArea(area, defs, headers, datasetKey) {
+      area.innerHTML = '';
+      defs.forEach(def => {
         const wrapper = document.createElement('label');
         wrapper.className = 'field';
         const select = document.createElement('select');
-        select.dataset.mapKey = def.key;
+        select.dataset[datasetKey] = def.key;
 
         const empty = document.createElement('option');
         empty.value = '';
         empty.textContent = def.required ? '選択してください' : '使わない / 列なし';
         select.appendChild(empty);
 
-        state.headers.forEach(header => {
+        headers.forEach(header => {
           const opt = document.createElement('option');
           opt.value = header;
           opt.textContent = header;
           select.appendChild(opt);
         });
 
-        const auto = findHeader(def.candidates);
+        const auto = findHeader(def.candidates, headers);
         if (auto) select.value = auto;
 
         wrapper.appendChild(document.createTextNode(def.label + (def.required ? ' *' : '')));
         wrapper.appendChild(select);
-        els.mappingArea.appendChild(wrapper);
+        area.appendChild(wrapper);
       });
     }
 
-    function findHeader(candidates) {
+    function findHeader(candidates, headers) {
       for (const c of candidates) {
-        const exact = state.headers.find(h => h === c);
+        const exact = headers.find(h => h === c);
         if (exact) return exact;
       }
       for (const c of candidates) {
-        const partial = state.headers.find(h => h.includes(c) || c.includes(h));
+        const partial = headers.find(h => h.includes(c) || c.includes(h));
         if (partial) return partial;
       }
       return '';
@@ -1060,11 +1205,22 @@
 
     function getMapping() {
       const mapping = {};
-      document.querySelectorAll('select[data-map-key]').forEach(sel => {
-        mapping[sel.dataset.mapKey] = sel.value;
+      document.querySelectorAll('select[data-history-map-key]').forEach(sel => {
+        mapping[sel.dataset.historyMapKey] = sel.value;
       });
       const missing = mappingDefs.filter(d => d.required && !mapping[d.key]).map(d => d.label);
-      if (missing.length) throw new Error('必須列が未選択です: ' + missing.join(', '));
+      if (missing.length) throw new Error('対応履歴CSVの必須列が未選択です: ' + missing.join(', '));
+      return mapping;
+    }
+
+    function getApplicantMapping() {
+      if (!state.applicantRows.length) return null;
+      const mapping = {};
+      document.querySelectorAll('select[data-applicant-map-key]').forEach(sel => {
+        mapping[sel.dataset.applicantMapKey] = sel.value;
+      });
+      const missing = applicantMappingDefs.filter(d => d.required && !mapping[d.key]).map(d => d.label);
+      if (missing.length) throw new Error('応募者情報CSVの必須列が未選択です: ' + missing.join(', '));
       return mapping;
     }
 
@@ -1101,15 +1257,25 @@
 
     function processData() {
       const mapping = getMapping();
+      const applicantMapping = getApplicantMapping();
       const settings = getSettings();
       const log = createLog();
       const normalizedRows = normalizeRows(state.rows, mapping, settings, log);
-      const groups = groupByApplicant(normalizedRows, log);
-      const rawResult = buildResults(groups, settings, log);
+
+      let rawResult;
+      if (state.applicantRows.length && applicantMapping) {
+        const applicantRows = normalizeApplicantRows(state.applicantRows, applicantMapping, settings, log);
+        const applicantGroups = groupApplicantInfo(applicantRows, log);
+        const historyMap = groupHistoryRowsByApplicantKey(normalizedRows);
+        rawResult = buildResultsFromApplicants(applicantGroups, historyMap, settings, log);
+      } else {
+        const groups = groupByApplicant(normalizedRows, log);
+        rawResult = buildResults(groups, settings, log);
+      }
       const result = applyAnonymization(rawResult, settings, log);
 
       state.result = result;
-      state.workbook = createWorkbook(result, mapping, settings, log);
+      state.workbook = createWorkbook(result, mapping, applicantMapping, settings, log);
       state.outputName = makeOutputName(state.file ? state.file.name : 'etl_result.csv');
 
       renderResult(result, log);
@@ -1122,19 +1288,30 @@
     function createLog() {
       return {
         inputRows: state.rows.length,
+        applicantInputRows: state.applicantRows.length,
         normalizedRows: 0,
+        normalizedApplicantRows: 0,
         skippedRows: 0,
+        skippedApplicantRows: 0,
         invalidApplyDate: 0,
+        invalidApplicantApplyDate: 0,
         invalidActionDate: 0,
         noApplicantNameColumn: 0,
         blankApplicantName: 0,
+        blankApplicantInfoName: 0,
         exactTransitions: 0,
         groups: 0,
+        applicantGroups: 0,
+        applicantDuplicateGroups: 0,
+        applicantDuplicateRows: 0,
+        historyMatchedGroups: 0,
+        historyUnmatchedGroups: 0,
         exactEvents: 0,
         fallbackEvents: 0,
         negativeDurationEvents: 0,
         anonymizedApplicants: 0,
         anonymizedUsers: 0,
+        joinRows: [],
         warnings: []
       };
     }
@@ -1167,6 +1344,7 @@
         const fallbackName = `__NO_NAME_ROW_${i + 2}`;
         const nameForKey = normalizedName || fallbackName;
         const applicantKey = `${applyMonth}_${nameForKey}`;
+        const joinKey = `${nameForKey}_${formatDateTime(applyDate)}`;
 
         const content = cell(row, mapping.content);
         const transition = parseTransition(content);
@@ -1183,6 +1361,7 @@
           applicantName: rawName,
           applicantNameNormalized: normalizedName || (hasApplicantNameCol ? '' : '(応募者名列なし)'),
           applicantKey,
+          joinKey,
           jobNo: cell(row, mapping.jobNo),
           jobTitle: cell(row, mapping.jobTitle),
           updateUser: cell(row, mapping.updateUser),
@@ -1195,6 +1374,84 @@
 
       log.normalizedRows = out.length;
       return out;
+    }
+
+    function normalizeApplicantRows(rows, mapping, settings, log) {
+      const out = [];
+      rows.forEach((row, i) => {
+        const applyDateRaw = cell(row, mapping.applyDate);
+        const applyDate = parseDate(applyDateRaw);
+        if (!applyDate) {
+          log.invalidApplicantApplyDate++;
+          log.skippedApplicantRows++;
+          return;
+        }
+
+        const rawName = cell(row, mapping.applicantName);
+        const normalizedName = normalizeName(rawName);
+        if (!normalizedName) {
+          log.blankApplicantInfoName++;
+          log.skippedApplicantRows++;
+          return;
+        }
+
+        const applyMonth = formatMonth(applyDate);
+        const applicantKey = `${applyMonth}_${normalizedName}`;
+        const joinKey = `${normalizedName}_${formatDateTime(applyDate)}`;
+        const age = parseAge(cell(row, mapping.age));
+        const workplaceAddress = cell(row, mapping.workplaceAddress);
+
+        out.push({
+          rowNo: i + 2,
+          raw: row,
+          applyDateRaw,
+          applyDate,
+          applyMonth,
+          applicantName: rawName,
+          applicantNameNormalized: normalizedName,
+          applicantKey,
+          joinKey,
+          jobNo: cell(row, mapping.jobNo),
+          jobTitle: cell(row, mapping.jobTitle),
+          age,
+          ageGroup: ageGroup(age),
+          media: cell(row, mapping.media),
+          workplaceName: cell(row, mapping.workplaceName),
+          workplaceAddress,
+          prefecture: extractPrefecture(workplaceAddress),
+          jobCategory: cell(row, mapping.jobCategory),
+          description: cell(row, mapping.description)
+        });
+      });
+      log.normalizedApplicantRows = out.length;
+      return out;
+    }
+
+    function groupApplicantInfo(rows, log) {
+      const map = new Map();
+      rows.forEach(r => {
+        if (!map.has(r.applicantKey)) map.set(r.applicantKey, []);
+        map.get(r.applicantKey).push(r);
+      });
+      const groups = Array.from(map.entries()).map(([key, list]) => {
+        list.sort(compareRowsByApplyThenRow);
+        return { key, rows: list };
+      });
+      log.applicantGroups = groups.length;
+      log.groups = groups.length;
+      log.applicantDuplicateGroups = groups.filter(g => g.rows.length > 1).length;
+      log.applicantDuplicateRows = groups.reduce((sum, g) => sum + Math.max(0, g.rows.length - 1), 0);
+      return groups;
+    }
+
+    function groupHistoryRowsByApplicantKey(rows) {
+      const map = new Map();
+      rows.forEach(r => {
+        if (!map.has(r.applicantKey)) map.set(r.applicantKey, []);
+        map.get(r.applicantKey).push(r);
+      });
+      map.forEach(list => list.sort(compareRowsByActionThenRow));
+      return map;
     }
 
     function groupByApplicant(rows, log) {
@@ -1245,12 +1502,70 @@
       return { summaries, events };
     }
 
-    function getBaseApplication(rows, settings) {
-      const byApply = rows.slice().sort((a, b) => {
-        const diff = a.applyDate - b.applyDate;
-        if (diff !== 0) return diff;
-        return a.rowNo - b.rowNo;
+    function buildResultsFromApplicants(applicantGroups, historyMap, settings, log) {
+      const summaries = [];
+      const events = [];
+      const matchedHistoryKeys = new Set();
+
+      applicantGroups.forEach(group => {
+        const applicantRows = group.rows;
+        const base = getBaseFromApplicantInfo(applicantRows, settings);
+        const historyRows = (historyMap.get(group.key) || []).slice().sort(compareRowsByActionThenRow);
+        if (historyRows.length) matchedHistoryKeys.add(group.key);
+
+        const eventMap = {
+          firstAction: findEvent(historyRows, settings, log, '初回アクション', (from, to) => from === settings.untouched && to !== settings.untouched, (status) => status && status !== settings.untouched),
+          interview: findEvent(historyRows, settings, log, '面接以上到達', (from, to) => settings.interviewSet.has(to) && !settings.interviewSet.has(from), (status) => settings.interviewSet.has(status)),
+          offer: findEvent(historyRows, settings, log, '内定以上到達', (from, to) => settings.offerSet.has(to) && !settings.offerSet.has(from), (status) => settings.offerSet.has(status)),
+          hire: findEvent(historyRows, settings, log, '採用以上到達', (from, to) => settings.hireSet.has(to) && !settings.hireSet.has(from), (status) => settings.hireSet.has(status))
+        };
+
+        events.push(makeEventRow(base, '応募', base.applyDate, '', '', '', '', 0, 0, 'base', settings));
+        const firstActionEvent = addOptionalEvent(events, base, eventMap.firstAction, '初回アクション', settings, log);
+        const interviewEvent = addOptionalEvent(events, base, eventMap.interview, '面接以上到達', settings, log);
+        const offerEvent = addOptionalEvent(events, base, eventMap.offer, '内定以上到達', settings, log);
+        const hireEvent = addOptionalEvent(events, base, eventMap.hire, '採用以上到達', settings, log);
+
+        summaries.push(makeSummaryRow(base, historyRows, firstActionEvent, interviewEvent, offerEvent, hireEvent, settings));
+        log.joinRows.push({
+          '応募者キー': group.key,
+          '応募者情報CSV行数': applicantRows.length,
+          '対応履歴CSV行数': historyRows.length,
+          '結合状態': historyRows.length ? '結合あり' : '応募者情報のみ',
+          '結合キー一覧': uniqueList(applicantRows.map(r => r.joinKey)).join(' | '),
+          '応募者情報_最初の応募日時': formatDateTime(base.applyDate),
+          '応募者情報_最後の応募日時': base.lastApplyDate ? formatDateTime(base.lastApplyDate) : ''
+        });
       });
+
+      historyMap.forEach((rows, key) => {
+        if (!matchedHistoryKeys.has(key)) {
+          log.joinRows.push({
+            '応募者キー': key,
+            '応募者情報CSV行数': 0,
+            '対応履歴CSV行数': rows.length,
+            '結合状態': '対応履歴のみ',
+            '結合キー一覧': uniqueList(rows.map(r => r.joinKey)).join(' | '),
+            '応募者情報_最初の応募日時': '',
+            '応募者情報_最後の応募日時': ''
+          });
+        }
+      });
+
+      log.historyMatchedGroups = matchedHistoryKeys.size;
+      log.historyUnmatchedGroups = Math.max(0, historyMap.size - matchedHistoryKeys.size);
+
+      summaries.sort((a, b) => String(a['応募日時']).localeCompare(String(b['応募日時'])));
+      events.sort((a, b) => {
+        const m = String(a['応募日時']).localeCompare(String(b['応募日時']));
+        if (m !== 0) return m;
+        return String(a['イベント日時']).localeCompare(String(b['イベント日時']));
+      });
+      return { summaries, events };
+    }
+
+    function getBaseApplication(rows, settings) {
+      const byApply = rows.slice().sort(compareRowsByApplyThenRow);
       const first = byApply[0];
       const timing = getTimingInfo(first.applyDate, settings);
       return {
@@ -1261,7 +1576,59 @@
         jobNo: first.jobNo,
         jobTitle: first.jobTitle,
         applyDate: first.applyDate,
-        applyTiming: timing
+        lastApplyDate: first.applyDate,
+        applyTiming: timing,
+        age: '',
+        ageGroup: '',
+        media: '',
+        workplaceName: '',
+        workplaceAddress: '',
+        prefecture: '',
+        jobCategory: '',
+        applicantInfoRows: '',
+        duplicateFlag: '',
+        duplicateCount: '',
+        mediaList: '',
+        workplaceNameList: '',
+        workplaceAddressList: '',
+        jobCategoryList: '',
+        joinKeyList: first.joinKey || '',
+        sourceType: '対応履歴CSVのみ'
+      };
+    }
+
+    function getBaseFromApplicantInfo(rows, settings) {
+      const sorted = rows.slice().sort(compareRowsByApplyThenRow);
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const timing = getTimingInfo(first.applyDate, settings);
+      const age = firstNonEmpty(sorted, 'age');
+      return {
+        applicantKey: first.applicantKey,
+        applyMonth: first.applyMonth,
+        applicantName: first.applicantName,
+        applicantNameNormalized: first.applicantNameNormalized,
+        jobNo: firstNonEmpty(sorted, 'jobNo'),
+        jobTitle: firstNonEmpty(sorted, 'jobTitle'),
+        applyDate: first.applyDate,
+        lastApplyDate: last.applyDate,
+        applyTiming: timing,
+        age,
+        ageGroup: ageGroup(age),
+        media: firstNonEmpty(sorted, 'media'),
+        workplaceName: firstNonEmpty(sorted, 'workplaceName'),
+        workplaceAddress: firstNonEmpty(sorted, 'workplaceAddress'),
+        prefecture: firstNonEmpty(sorted, 'prefecture'),
+        jobCategory: firstNonEmpty(sorted, 'jobCategory'),
+        applicantInfoRows: rows.length,
+        duplicateFlag: rows.length > 1 ? 1 : 0,
+        duplicateCount: rows.length,
+        mediaList: uniqueList(sorted.map(r => r.media)).join(' | '),
+        workplaceNameList: uniqueList(sorted.map(r => r.workplaceName)).join(' | '),
+        workplaceAddressList: uniqueList(sorted.map(r => r.workplaceAddress)).join(' | '),
+        jobCategoryList: uniqueList(sorted.map(r => r.jobCategory)).join(' | '),
+        joinKeyList: uniqueList(sorted.map(r => r.joinKey)).join(' | '),
+        sourceType: '応募者情報CSV母集団'
       };
     }
 
@@ -1336,6 +1703,21 @@
         '応募者名_正規化': base.applicantNameNormalized,
         '代表仕事番号': base.jobNo,
         '代表仕事名': base.jobTitle,
+        '年齢': base.age,
+        '年代': base.ageGroup,
+        '応募媒体': base.media,
+        '勤務場所名': base.workplaceName,
+        '勤務所在地': base.workplaceAddress,
+        '勤務所在地_都道府県': base.prefecture,
+        '職種分類': base.jobCategory,
+        '応募者情報CSV_重複応募数': base.duplicateCount,
+        '応募者情報CSV_重複フラグ': base.duplicateFlag,
+        '応募媒体一覧': base.mediaList,
+        '勤務場所名一覧': base.workplaceNameList,
+        '勤務所在地一覧': base.workplaceAddressList,
+        '職種分類一覧': base.jobCategoryList,
+        '応募者情報CSV_結合キー一覧': base.joinKeyList,
+        '母集団ソース': base.sourceType,
         '応募日時': formatDateTime(base.applyDate),
         '応募日': formatDate(base.applyDate),
         '応募曜日': weekdayLabel(base.applyDate),
@@ -1376,6 +1758,21 @@
         '応募者名_正規化': base.applicantNameNormalized,
         '代表仕事番号': base.jobNo,
         '代表仕事名': base.jobTitle,
+        '年齢': base.age,
+        '年代': base.ageGroup,
+        '応募媒体': base.media,
+        '勤務場所名': base.workplaceName,
+        '勤務所在地': base.workplaceAddress,
+        '勤務所在地_都道府県': base.prefecture,
+        '職種分類': base.jobCategory,
+        '応募者情報CSV_重複応募数': base.duplicateCount,
+        '応募者情報CSV_重複フラグ': base.duplicateFlag,
+        '応募媒体一覧': base.mediaList,
+        '勤務場所名一覧': base.workplaceNameList,
+        '勤務所在地一覧': base.workplaceAddressList,
+        '職種分類一覧': base.jobCategoryList,
+        '応募者情報CSV_結合キー一覧': base.joinKeyList,
+        '母集団ソース': base.sourceType,
         '応募日時': formatDateTime(base.applyDate),
         '応募日': formatDate(base.applyDate),
         '応募曜日': weekdayLabel(base.applyDate),
@@ -1434,13 +1831,14 @@
       };
     }
 
-    function createWorkbook(result, mapping, settings, log) {
+    function createWorkbook(result, mapping, applicantMapping, settings, log) {
       const wb = window.XLSX.utils.book_new();
       appendSheet(wb, '01_応募者サマリー', result.summaries);
       appendSheet(wb, '02_ピボット用イベント', result.events);
-      appendSheet(wb, '03_集計設定', buildSettingsSheet(mapping, settings));
+      appendSheet(wb, '03_集計設定', buildSettingsSheet(mapping, applicantMapping, settings));
       appendSheet(wb, '04_処理ログ・注意点', buildLogSheet(log));
       appendSheet(wb, '05_初回対応速度別集計', buildSpeedSummarySheet(result.summaries));
+      appendSheet(wb, '06_結合チェック', buildJoinCheckSheet(log, settings));
       return wb;
     }
 
@@ -1454,12 +1852,15 @@
       window.XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
     }
 
-    function buildSettingsSheet(mapping, settings) {
+    function buildSettingsSheet(mapping, applicantMapping, settings) {
       return [
         { '項目': '出力日時', '値': formatDateTime(new Date()), '補足': '' },
-        { '項目': '入力ファイル名', '値': state.file ? state.file.name : '', '補足': '' },
-        { '項目': '推定文字コード', '値': state.encoding, '補足': '出力はxlsxのため文字コード差は基本的に意識不要' },
-        { '項目': '応募者キー', '値': '応募月 + 応募者名_正規化', '補足': '応募者名列が未選択の場合はテスト用仮キー' },
+        { '項目': '対応履歴CSVファイル名', '値': state.file ? state.file.name : '', '補足': 'アクション履歴用' },
+        { '項目': '対応履歴CSV推定文字コード', '値': state.encoding, '補足': '出力はxlsxのため文字コード差は基本的に意識不要' },
+        { '項目': '応募者情報CSVファイル名', '値': state.applicantFile ? state.applicantFile.name : '', '補足': '存在する場合は母集団として優先' },
+        { '項目': '応募者情報CSV推定文字コード', '値': state.applicantEncoding, '補足': '' },
+        { '項目': '結合キー', '値': '氏名_正規化 + 応募日時_分', '補足': 'CSV間の照合確認用' },
+        { '項目': '集計キー', '値': '応募月 + 応募者名_正規化', '補足': '同月同名を1応募として集約' },
         { '項目': '非稼働曜日', '値': offDayLabels(settings).join(','), '補足': '' },
         { '項目': '営業開始', '値': timeObjectToString(settings.bizStart), '補足': '' },
         { '項目': '営業終了', '値': timeObjectToString(settings.bizEnd), '補足': '' },
@@ -1473,20 +1874,31 @@
         { '項目': '面接以上ステータス', '値': Array.from(settings.interviewSet).join(','), '補足': '' },
         { '項目': '内定以上ステータス', '値': Array.from(settings.offerSet).join(','), '補足': '' },
         { '項目': '採用以上ステータス', '値': Array.from(settings.hireSet).join(','), '補足': '' },
-        ...mappingDefs.map(def => ({ '項目': `列マッピング_${def.label}`, '値': mapping[def.key] || '', '補足': def.required ? '必須' : '' }))
+        ...mappingDefs.map(def => ({ '項目': `対応履歴CSV列_${def.label}`, '値': mapping[def.key] || '', '補足': def.required ? '必須' : '' })),
+        ...(applicantMapping ? applicantMappingDefs.map(def => ({ '項目': `応募者情報CSV列_${def.label}`, '値': applicantMapping[def.key] || '', '補足': def.required ? '必須' : '' })) : [])
       ];
     }
 
     function buildLogSheet(log) {
       const rows = [
-        { '項目': '入力行数', '値': log.inputRows, '補足': '' },
-        { '項目': '処理対象行数', '値': log.normalizedRows, '補足': '応募日付が正常に読めた行' },
-        { '項目': 'スキップ行数', '値': log.skippedRows, '補足': '主に応募日付不正' },
+        { '項目': '対応履歴CSV入力行数', '値': log.inputRows, '補足': '' },
+        { '項目': '応募者情報CSV入力行数', '値': log.applicantInputRows, '補足': '' },
+        { '項目': '対応履歴CSV処理対象行数', '値': log.normalizedRows, '補足': '応募日付が正常に読めた行' },
+        { '項目': '応募者情報CSV処理対象行数', '値': log.normalizedApplicantRows, '補足': '応募日時と氏名が正常に読めた行' },
+        { '項目': '対応履歴CSVスキップ行数', '値': log.skippedRows, '補足': '主に応募日付不正' },
+        { '項目': '応募者情報CSVスキップ行数', '値': log.skippedApplicantRows, '補足': '主に応募日時不正または氏名空欄' },
         { '項目': '応募者キー数', '値': log.groups, '補足': '応募月 + 応募者名' },
-        { '項目': '応募日付変換失敗', '値': log.invalidApplyDate, '補足': '' },
+        { '項目': '応募者情報CSVキー数', '値': log.applicantGroups, '補足': '応募者情報CSVがある場合' },
+        { '項目': '応募者情報CSV重複キー数', '値': log.applicantDuplicateGroups, '補足': '同月同名で複数応募があったキー数' },
+        { '項目': '応募者情報CSV重複行数', '値': log.applicantDuplicateRows, '補足': '代表行以外の重複行数' },
+        { '項目': '対応履歴結合ありキー数', '値': log.historyMatchedGroups, '補足': '応募者情報CSVと対応履歴CSVの集計キー一致' },
+        { '項目': '対応履歴のみキー数', '値': log.historyUnmatchedGroups, '補足': '応募者情報CSVに無い対応履歴キー' },
+        { '項目': '応募日付変換失敗', '値': log.invalidApplyDate, '補足': '対応履歴CSV' },
+        { '項目': '応募者情報CSV応募日時変換失敗', '値': log.invalidApplicantApplyDate, '補足': '' },
         { '項目': '対応日付変換失敗', '値': log.invalidActionDate, '補足': '' },
-        { '項目': '応募者名列なし行数', '値': log.noApplicantNameColumn, '補足': '' },
-        { '項目': '応募者名空欄行数', '値': log.blankApplicantName, '補足': '' },
+        { '項目': '応募者名列なし行数', '値': log.noApplicantNameColumn, '補足': '対応履歴CSV' },
+        { '項目': '対応履歴CSV応募者名空欄行数', '値': log.blankApplicantName, '補足': '' },
+        { '項目': '応募者情報CSV氏名空欄行数', '値': log.blankApplicantInfoName, '補足': '' },
         { '項目': '対応状態変更の抽出件数', '値': log.exactTransitions, '補足': '対応内容から変更前/変更後を抽出できた件数' },
         { '項目': 'exactイベント件数', '値': log.exactEvents, '補足': '対応内容の変更前/変更後から判定' },
         { '項目': 'fallbackイベント件数', '値': log.fallbackEvents, '補足': '対応ステータス名から推定' },
@@ -1496,6 +1908,31 @@
       ];
       log.warnings.forEach((w, i) => rows.push({ '項目': `警告${i + 1}`, '値': w, '補足': '' }));
       return rows;
+    }
+
+    function buildJoinCheckSheet(log, settings) {
+      if (log.joinRows && log.joinRows.length) {
+        if (!settings.anonymizeApplicants) return log.joinRows;
+        const keyMap = new Map();
+        const getAnonKey = (key) => {
+          const sourceKey = String(key || '');
+          if (!keyMap.has(sourceKey)) {
+            const month = (sourceKey.match(/^\d{4}-\d{2}/) || [''])[0];
+            const anon = `応募者${padNumber(keyMap.size + 1, 6)}`;
+            keyMap.set(sourceKey, month ? `${month}_${anon}` : anon);
+          }
+          return keyMap.get(sourceKey);
+        };
+        return log.joinRows.map(row => ({
+          ...row,
+          '応募者キー': getAnonKey(row['応募者キー']),
+          '結合キー一覧': '(匿名化済み)'
+        }));
+      }
+      return [{
+        'メッセージ': '応募者情報CSVを使用していないため、結合チェックはありません。',
+        '対応履歴CSVキー数': log.groups || 0
+      }];
     }
 
 
@@ -1576,6 +2013,7 @@
       row['応募者キー'] = applyMonth ? `${applyMonth}_${anonId}` : anonId;
       if ('応募者名' in row) row['応募者名'] = anonId;
       if ('応募者名_正規化' in row) row['応募者名_正規化'] = anonId;
+      if ('応募者情報CSV_結合キー一覧' in row) row['応募者情報CSV_結合キー一覧'] = '(匿名化済み)';
     }
 
     function anonymizeUserFields(row, getUserId) {
@@ -1649,22 +2087,32 @@
       state.text = '';
       state.headers = [];
       state.rows = [];
+      state.applicantFile = null;
+      state.applicantEncoding = '';
+      state.applicantText = '';
+      state.applicantHeaders = [];
+      state.applicantRows = [];
       state.result = null;
       state.workbook = null;
       state.outputName = '';
       els.fileInput.value = '';
+      els.applicantFileInput.value = '';
       els.fileMeta.textContent = '未読み込み';
+      els.applicantFileMeta.textContent = '未読み込み';
       els.mappingCard.classList.add('hidden');
+      els.applicantMappingCard.classList.add('hidden');
       els.resultCard.classList.add('hidden');
       els.processBtn.disabled = true;
       els.downloadBtn.disabled = true;
       els.mappingArea.innerHTML = '';
+      els.applicantMappingArea.innerHTML = '';
       els.previewArea.innerHTML = '';
       els.summaryPills.innerHTML = '';
       els.logArea.textContent = '';
       els.logCard.classList.add('hidden');
-      els.quickStatus.textContent = 'CSV読み込み後に生成できます。';
-      setDropzoneIdle();
+      els.quickStatus.textContent = '対応履歴CSVを読み込むと生成できます。応募者情報CSVは任意です。';
+      setHistoryDropzoneIdle();
+      setApplicantDropzoneIdle();
       closeConfigModal();
     }
 
@@ -1773,11 +2221,60 @@
     function minDate(a, b) { return a < b ? a : b; }
     function diffMinutes(a, b) { return Math.round((b - a) / 60000); }
 
+    function compareRowsByApplyThenRow(a, b) {
+      const ad = a.applyDate ? a.applyDate.getTime() : Number.POSITIVE_INFINITY;
+      const bd = b.applyDate ? b.applyDate.getTime() : Number.POSITIVE_INFINITY;
+      if (ad !== bd) return ad - bd;
+      return a.rowNo - b.rowNo;
+    }
+
     function compareRowsByActionThenRow(a, b) {
       const ad = a.actionDate ? a.actionDate.getTime() : Number.POSITIVE_INFINITY;
       const bd = b.actionDate ? b.actionDate.getTime() : Number.POSITIVE_INFINITY;
       if (ad !== bd) return ad - bd;
       return a.rowNo - b.rowNo;
+    }
+
+    function firstNonEmpty(rows, key) {
+      for (const row of rows) {
+        const value = row[key];
+        if (value !== null && value !== undefined && String(value).trim() !== '') return value;
+      }
+      return '';
+    }
+
+    function uniqueList(values) {
+      const seen = new Set();
+      const out = [];
+      values.forEach(value => {
+        const v = String(value ?? '').trim();
+        if (!v || seen.has(v)) return;
+        seen.add(v);
+        out.push(v);
+      });
+      return out;
+    }
+
+    function parseAge(value) {
+      const m = String(value || '').match(/\d+/);
+      if (!m) return '';
+      const n = Number(m[0]);
+      return Number.isFinite(n) ? n : '';
+    }
+
+    function ageGroup(age) {
+      if (age === '' || age === null || age === undefined || isNaN(Number(age))) return '';
+      const n = Number(age);
+      if (n < 20) return '10代以下';
+      if (n >= 70) return '70代以上';
+      return `${Math.floor(n / 10) * 10}代`;
+    }
+
+    function extractPrefecture(address) {
+      const s = String(address || '').trim();
+      if (!s) return '';
+      const m = s.match(/(北海道|東京都|大阪府|京都府|.{2,3}県)/);
+      return m ? m[1] : '';
     }
 
     function cell(row, col) {
