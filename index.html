@@ -113,6 +113,17 @@
       padding: 22px;
       transition: .18s ease;
       cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dropzone::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(37,99,235,.05), transparent 42%, rgba(15,118,110,.05));
+      opacity: .8;
+      pointer-events: none;
     }
 
     .dropzone.dragover {
@@ -121,15 +132,85 @@
       transform: translateY(-1px);
     }
 
+    .dropzone.is-loaded {
+      border-style: solid;
+      border-color: #10b981;
+      background: linear-gradient(180deg, #f0fdf4, #f8fffb);
+      box-shadow: inset 0 0 0 1px rgba(16,185,129,.08);
+    }
+
+    .dropzone-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dropzone-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-size: 30px;
+      background: #e8f0ff;
+      color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(37,99,235,.08);
+      transition: .18s ease;
+    }
+
+    .dropzone.is-loaded .dropzone-icon {
+      background: #dcfce7;
+      color: #059669;
+      box-shadow: inset 0 0 0 1px rgba(5,150,105,.10);
+    }
+
+    .dropzone-copy {
+      display: grid;
+      gap: 4px;
+    }
+
     .dropzone strong {
       display: block;
       font-size: 18px;
-      margin-bottom: 4px;
+      margin-bottom: 0;
     }
 
     .dropzone span {
       color: var(--muted);
       font-size: 13px;
+    }
+
+    .dropzone-loaded-meta {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(16,185,129,.18);
+      color: #065f46;
+      font-size: 12px;
+      font-weight: 700;
+      max-width: 100%;
+    }
+
+    .file-badge.file-name {
+      max-width: min(100%, 520px);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     .hidden { display: none !important; }
@@ -219,9 +300,9 @@
 
     .settings-grid {
       display: grid;
-      grid-template-columns: 1.2fr .8fr 1fr;
-      gap: 18px;
-      align-items: start;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
     }
 
     @media (max-width: 960px) {
@@ -232,6 +313,37 @@
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
+    }
+
+    .setting-block {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+      min-height: 100%;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+    }
+
+    .setting-block.wide {
+      grid-column: span 2;
+    }
+
+    .setting-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+
+    .setting-block .hint {
+      margin-top: auto;
+    }
+
+    @media (max-width: 960px) {
+      .setting-block.wide { grid-column: auto; }
     }
 
     .check-card {
@@ -254,6 +366,10 @@
       gap: 10px;
     }
 
+    .mini-grid.tight {
+      gap: 12px;
+    }
+
     .mini-grid-3 {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -263,7 +379,7 @@
     .toggle-list {
       display: grid;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 0;
     }
 
     .toggle-row {
@@ -503,9 +619,13 @@
     <section class="card">
       <h2>CSVアップロード</h2>
       <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="CSVファイルを選択">
-        <div>
-          <strong>CSVをドラッグ＆ドロップ</strong>
-          <span>またはクリックしてファイルを選択</span>
+        <div class="dropzone-inner">
+          <div id="dropzoneIcon" class="dropzone-icon">📄</div>
+          <div class="dropzone-copy">
+            <strong id="dropzoneTitle">CSVをドラッグ＆ドロップ</strong>
+            <span id="dropzoneSubtext">またはクリックしてファイルを選択</span>
+          </div>
+          <div id="dropzoneLoadedMeta" class="dropzone-loaded-meta hidden"></div>
         </div>
       </div>
       <input id="fileInput" class="hidden" type="file" accept=".csv,text/csv" />
@@ -515,16 +635,15 @@
     <section id="settingsCard" class="card">
       <h2>集計条件設定</h2>
       <div class="settings-grid">
-        <div>
-          <label class="field">
-            非稼働曜日
-            <div class="weekday-boxes" id="weekdayBoxes"></div>
-          </label>
+        <div class="setting-block wide">
+          <p class="setting-title">非稼働曜日</p>
+          <div class="weekday-boxes" id="weekdayBoxes"></div>
           <p class="hint">初期値は土日です。例：水日休みにしたい場合は「水」「日」を選択してください。</p>
         </div>
 
-        <div>
-          <div class="mini-grid">
+        <div class="setting-block">
+          <p class="setting-title">営業時間</p>
+          <div class="mini-grid tight">
             <label class="field">営業開始
               <input id="bizStart" type="time" value="09:00" />
             </label>
@@ -535,7 +654,8 @@
           <p class="hint">営業時間内経過分の計算に使います。</p>
         </div>
 
-        <div>
+        <div class="setting-block">
+          <p class="setting-title">時間集計ルール</p>
           <div class="mini-grid-3">
             <label class="field">時間バケット幅
               <select id="bucketMinutes">
@@ -556,6 +676,10 @@
             </label>
           </div>
           <p class="hint">例：幅1時間・上限24時間なら「0～1時間」「1～2時間」…「24時間超」に区切ります。比較ラインは「3時間以内 / 3時間超」などの率比較に使います。</p>
+        </div>
+
+        <div class="setting-block">
+          <p class="setting-title">匿名化</p>
           <div class="toggle-list">
             <label class="toggle-row">
               <span>応募者名を匿名化して出力</span>
@@ -684,6 +808,10 @@
 
     const els = {
       dropzone: document.getElementById('dropzone'),
+      dropzoneIcon: document.getElementById('dropzoneIcon'),
+      dropzoneTitle: document.getElementById('dropzoneTitle'),
+      dropzoneSubtext: document.getElementById('dropzoneSubtext'),
+      dropzoneLoadedMeta: document.getElementById('dropzoneLoadedMeta'),
       fileInput: document.getElementById('fileInput'),
       fileMeta: document.getElementById('fileMeta'),
       configBtn: document.getElementById('configBtn'),
@@ -721,6 +849,7 @@
     function init() {
       renderWeekdayBoxes();
       bindEvents();
+      setDropzoneIdle();
       const missing = requiredLibs.filter(([, getter]) => !getter()).map(([name]) => name);
       if (missing.length) {
         appendLog('ライブラリ読み込みに失敗しました: ' + missing.join(', '));
@@ -802,6 +931,29 @@
       });
     }
 
+    function setDropzoneIdle() {
+      els.dropzone.classList.remove('is-loaded');
+      els.dropzoneIcon.textContent = '📄';
+      els.dropzoneTitle.textContent = 'CSVをドラッグ＆ドロップ';
+      els.dropzoneSubtext.textContent = 'またはクリックしてファイルを選択';
+      els.dropzoneLoadedMeta.classList.add('hidden');
+      els.dropzoneLoadedMeta.innerHTML = '';
+    }
+
+    function setDropzoneLoaded(file, encoding, rowCount, colCount) {
+      els.dropzone.classList.add('is-loaded');
+      els.dropzoneIcon.textContent = '✓';
+      els.dropzoneTitle.textContent = 'CSVを読み込み済みです';
+      els.dropzoneSubtext.textContent = '別ファイルを使う場合は、この枠をクリックまたはドラッグ＆ドロップしてください。';
+      els.dropzoneLoadedMeta.classList.remove('hidden');
+      els.dropzoneLoadedMeta.innerHTML = [
+        `<span class="file-badge file-name">📎 ${escapeHtml(file.name || '')}</span>`,
+        `<span class="file-badge">${escapeHtml(formatFileSize(file.size || 0))}</span>`,
+        `<span class="file-badge">${escapeHtml(encoding)}</span>`,
+        `<span class="file-badge">${rowCount}行 / ${colCount}列</span>`
+      ].join('');
+    }
+
     async function loadFile(file) {
       resetResultOnly();
       state.file = file;
@@ -839,6 +991,7 @@
       els.settingsCard.classList.remove('hidden');
       els.quickStatus.textContent = state.rows.length ? 'CSV読み込み済みです。必要に応じて条件を確認し、Excelを生成できます。' : 'CSVにデータ行がありません。';
       els.processBtn.disabled = state.rows.length === 0;
+      setDropzoneLoaded(file, detected, state.rows.length, state.headers.length);
       appendLog(`読み込み完了: ${state.rows.length}行 / ${state.headers.length}列`);
     }
 
@@ -1511,6 +1664,7 @@
       els.logArea.textContent = '';
       els.logCard.classList.add('hidden');
       els.quickStatus.textContent = 'CSV読み込み後に生成できます。';
+      setDropzoneIdle();
       closeConfigModal();
     }
 
