@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>応募対応履歴 ETL / Excel出力ツール</title>
+
+  <!--
+    GitHub Pages で index.html 単体運用する想定です。
+    外部ライブラリは CDN から読み込みます。
+      - encoding-japanese: CSV入力の文字コード判定・Unicode変換
+      - Papa Parse: CSVパース
+      - SheetJS: Excel(xlsx)生成
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.2.0/encoding.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.4/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --panel-soft: #f1f5f9;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --accent: #2563eb;
+      --accent-2: #0f766e;
+      --danger: #dc2626;
+      --warn: #b45309;
+      --ok: #15803d;
+      --shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, .10), transparent 30%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, .10), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    header {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 36px 22px 18px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(26px, 4vw, 40px);
+      line-height: 1.18;
+      letter-spacing: .02em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      max-width: 900px;
+      font-size: 15px;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto 56px;
+      padding: 0 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(219, 227, 239, .9);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .dropzone {
+      border: 2px dashed #a7b7d6;
+      background: linear-gradient(180deg, #fff, #f8fbff);
+      border-radius: 18px;
+      min-height: 156px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 22px;
+      transition: .18s ease;
+      cursor: pointer;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: #eff6ff;
+      transform: translateY(-1px);
+    }
+
+    .dropzone strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .dropzone span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hidden { display: none !important; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    button, .button-like {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: .16s ease;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(37,99,235,.18);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover, .button-like:hover { transform: translateY(-1px); }
+    button:disabled {
+      cursor: not-allowed;
+      background: #94a3b8;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button.secondary {
+      background: #334155;
+      box-shadow: 0 8px 18px rgba(51,65,85,.15);
+    }
+
+    button.success {
+      background: var(--accent-2);
+      box-shadow: 0 8px 18px rgba(15,118,110,.15);
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 860px) {
+      .mapping-grid { grid-template-columns: 1fr; }
+    }
+
+    label.field {
+      display: grid;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    select, input[type="time"], input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 4px rgba(37,99,235,.10);
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 960px) {
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+
+    .weekday-boxes {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .check-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 12px;
+      padding: 8px 6px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .check-card input { margin-right: 3px; }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      background: var(--panel-soft);
+      color: #334155;
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .pill.ok { background: #dcfce7; color: var(--ok); }
+    .pill.warn { background: #fef3c7; color: var(--warn); }
+    .pill.danger { background: #fee2e2; color: var(--danger); }
+
+    .preview {
+      overflow: auto;
+      max-height: 420px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #edf2f7;
+      padding: 9px 10px;
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      color: #334155;
+      z-index: 1;
+    }
+
+    .log {
+      background: #0f172a;
+      color: #dbeafe;
+      border-radius: 14px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow: auto;
+    }
+
+    .small-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>応募対応履歴 ETL / Excel出力ツール</h1>
+    <p class="lead">
+      応募対応履歴CSVを読み込み、応募者単位のサマリーとピボット集計用イベントデータをExcelファイルとして出力します。処理はブラウザ内で完結し、ファイルはサーバーに送信されません。
+    </p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. CSVアップロード</h2>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="CSVファイルを選択">
+        <div>
+          <strong>CSVをドラッグ＆ドロップ</strong>
+          <span>またはクリックしてファイルを選択</span>
+        </div>
+      </div>
+      <input id="fileInput" class="hidden" type="file" accept=".csv,text/csv" />
+      <div id="fileMeta" class="meta">未読み込み</div>
+    </section>
+
+    <section id="mappingCard" class="card hidden">
+      <h2>2. 列マッピング確認</h2>
+      <p class="small-note">自動判定しています。列名が異なる場合は、ここで変更してください。</p>
+      <div id="mappingArea" class="mapping-grid"></div>
+    </section>
+
+    <section id="settingsCard" class="card hidden">
+      <h2>3. 集計条件設定</h2>
+      <div class="settings-grid">
+        <div>
+          <label class="field">
+            非稼働曜日
+            <div class="weekday-boxes" id="weekdayBoxes"></div>
+          </label>
+          <p class="hint">初期値は土日です。例：水日休みにしたい場合は「水」「日」を選択してください。</p>
+        </div>
+
+        <div>
+          <div class="mini-grid">
+            <label class="field">営業開始
+              <input id="bizStart" type="time" value="09:00" />
+            </label>
+            <label class="field">営業終了
+              <input id="bizEnd" type="time" value="18:00" />
+            </label>
+          </div>
+          <p class="hint">営業時間内経過分の計算に使います。</p>
+        </div>
+
+        <div>
+          <label class="field">
+            旧データの推定判定
+            <select id="useFallback">
+              <option value="true" selected>使う：対応ステータス名から推定</option>
+              <option value="false">使わない：対応内容の変更履歴だけ使う</option>
+            </select>
+          </label>
+          <p class="hint">対応内容に「対応状態をAからBに変更」が無い古いデータを扱うための設定です。</p>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px;">
+        <label class="field">面接以上ステータス
+          <input id="interviewStatuses" type="text" value="面接確定,内定,採用,入社" />
+        </label>
+        <label class="field">内定以上ステータス
+          <input id="offerStatuses" type="text" value="内定,採用,入社" />
+        </label>
+        <label class="field">採用以上ステータス
+          <input id="hireStatuses" type="text" value="採用,入社" />
+        </label>
+        <label class="field">未対応ステータス名
+          <input id="untouchedStatus" type="text" value="未対応" />
+        </label>
+      </div>
+
+      <div class="toolbar">
+        <button id="processBtn" class="success" disabled>Excelを作成する</button>
+        <button id="resetBtn" class="secondary" type="button">リセット</button>
+      </div>
+    </section>
+
+    <section id="resultCard" class="card hidden">
+      <h2>4. 処理結果プレビュー</h2>
+      <div id="summaryPills" class="pill-row"></div>
+      <div class="toolbar">
+        <button id="downloadBtn" disabled>Excelをダウンロード</button>
+      </div>
+      <p class="small-note">プレビューは先頭100行までです。Excelには全件を書き出します。</p>
+      <div id="previewArea" class="preview" style="margin-top:12px;"></div>
+    </section>
+
+    <section id="logCard" class="card hidden">
+      <h2>処理ログ</h2>
+      <div id="logArea" class="log"></div>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    const state = {
+      file: null,
+      encoding: '',
+      text: '',
+      headers: [],
+      rows: [],
+      result: null,
+      workbook: null,
+      outputName: ''
+    };
+
+    const requiredLibs = [
+      ['Encoding', () => window.Encoding],
+      ['Papa Parse', () => window.Papa],
+      ['SheetJS', () => window.XLSX]
+    ];
+
+    const mappingDefs = [
+      { key: 'applyDate', label: '応募日付列', required: true, candidates: ['応募日付', '応募日時', '応募日'] },
+      { key: 'applicantName', label: '応募者名列', required: false, candidates: ['応募者名', '氏名', '応募者氏名', '名前'] },
+      { key: 'jobNo', label: '仕事番号列', required: false, candidates: ['仕事番号', '求人番号', '管理番号'] },
+      { key: 'jobTitle', label: '仕事名列', required: false, candidates: ['仕事名', '求人名', '職種名', 'タイトル'] },
+      { key: 'actionDate', label: '対応日付列', required: true, candidates: ['対応日付', '対応日時', '更新日時', '処理日付'] },
+      { key: 'status', label: '対応ステータス名列', required: true, candidates: ['対応ステータス名', 'ステータス名', '対応状態', 'ステータス'] },
+      { key: 'content', label: '対応内容列', required: false, candidates: ['対応内容', '内容', '履歴内容', '更新内容'] },
+      { key: 'category', label: '区分列', required: false, candidates: ['区分', '種別'] }
+    ];
+
+    const weekdays = [
+      { label: '日', value: 0 },
+      { label: '月', value: 1 },
+      { label: '火', value: 2 },
+      { label: '水', value: 3 },
+      { label: '木', value: 4 },
+      { label: '金', value: 5 },
+      { label: '土', value: 6 }
+    ];
+
+    const els = {
+      dropzone: document.getElementById('dropzone'),
+      fileInput: document.getElementById('fileInput'),
+      fileMeta: document.getElementById('fileMeta'),
+      mappingCard: document.getElementById('mappingCard'),
+      mappingArea: document.getElementById('mappingArea'),
+      settingsCard: document.getElementById('settingsCard'),
+      weekdayBoxes: document.getElementById('weekdayBoxes'),
+      bizStart: document.getElementById('bizStart'),
+      bizEnd: document.getElementById('bizEnd'),
+      useFallback: document.getElementById('useFallback'),
+      interviewStatuses: document.getElementById('interviewStatuses'),
+      offerStatuses: document.getElementById('offerStatuses'),
+      hireStatuses: document.getElementById('hireStatuses'),
+      untouchedStatus: document.getElementById('untouchedStatus'),
+      processBtn: document.getElementById('processBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      resultCard: document.getElementById('resultCard'),
+      summaryPills: document.getElementById('summaryPills'),
+      downloadBtn: document.getElementById('downloadBtn'),
+      previewArea: document.getElementById('previewArea'),
+      logCard: document.getElementById('logCard'),
+      logArea: document.getElementById('logArea')
+    };
+
+    init();
+
+    function init() {
+      renderWeekdayBoxes();
+      bindEvents();
+      const missing = requiredLibs.filter(([, getter]) => !getter()).map(([name]) => name);
+      if (missing.length) {
+        appendLog('ライブラリ読み込みに失敗しました: ' + missing.join(', '));
+        appendLog('ネットワーク制限やCDNブロックがある場合は、ライブラリをローカル同梱する構成に変更してください。');
+      }
+    }
+
+    function bindEvents() {
+      els.dropzone.addEventListener('click', () => els.fileInput.click());
+      els.dropzone.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') els.fileInput.click();
+      });
+      els.fileInput.addEventListener('change', (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        if (file) loadFile(file);
+      });
+
+      ['dragenter', 'dragover'].forEach(type => {
+        els.dropzone.addEventListener(type, (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          els.dropzone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(type => {
+        els.dropzone.addEventListener(type, (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          els.dropzone.classList.remove('dragover');
+        });
+      });
+      els.dropzone.addEventListener('drop', (ev) => {
+        const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+        if (file) loadFile(file);
+      });
+
+      els.processBtn.addEventListener('click', () => {
+        try {
+          processData();
+        } catch (err) {
+          console.error(err);
+          appendLog('エラー: ' + (err && err.message ? err.message : String(err)));
+          alert('処理中にエラーが発生しました。処理ログを確認してください。');
+        }
+      });
+      els.downloadBtn.addEventListener('click', () => {
+        if (!state.workbook) return;
+        window.XLSX.writeFile(state.workbook, state.outputName || 'etl_result.xlsx', { compression: true });
+      });
+      els.resetBtn.addEventListener('click', resetAll);
+    }
+
+    function renderWeekdayBoxes() {
+      els.weekdayBoxes.innerHTML = '';
+      weekdays.forEach(day => {
+        const label = document.createElement('label');
+        label.className = 'check-card';
+        label.innerHTML = `<input type="checkbox" name="offday" value="${day.value}" ${day.value === 0 || day.value === 6 ? 'checked' : ''}>${day.label}`;
+        els.weekdayBoxes.appendChild(label);
+      });
+    }
+
+    async function loadFile(file) {
+      resetResultOnly();
+      state.file = file;
+      appendLog('読み込み開始: ' + file.name);
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const detected = detectEncoding(bytes);
+      const text = decodeBytes(bytes, detected);
+      state.encoding = detected;
+      state.text = text.replace(/^\uFEFF/, '');
+
+      const parsed = window.Papa.parse(state.text, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        transformHeader: h => String(h || '').replace(/^\uFEFF/, '').trim()
+      });
+
+      if (parsed.errors && parsed.errors.length) {
+        appendLog('CSVパース警告: ' + parsed.errors.slice(0, 5).map(e => e.message).join(' / '));
+      }
+
+      state.headers = parsed.meta.fields || [];
+      state.rows = (parsed.data || []).filter(row => Object.values(row).some(v => String(v || '').trim() !== ''));
+
+      els.fileMeta.textContent = [
+        `ファイル名: ${file.name}`,
+        `サイズ: ${formatFileSize(file.size)}`,
+        `推定文字コード: ${detected}`,
+        `列数: ${state.headers.length}`,
+        `データ行数: ${state.rows.length}`
+      ].join('\n');
+
+      renderMappings();
+      els.mappingCard.classList.remove('hidden');
+      els.settingsCard.classList.remove('hidden');
+      els.processBtn.disabled = state.rows.length === 0;
+      appendLog(`読み込み完了: ${state.rows.length}行 / ${state.headers.length}列`);
+    }
+
+    function detectEncoding(bytes) {
+      if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return 'UTF8_BOM';
+      try {
+        const detected = window.Encoding.detect(bytes);
+        return detected || 'UTF8';
+      } catch (_) {
+        return 'UTF8';
+      }
+    }
+
+    function decodeBytes(bytes, detected) {
+      let from = detected === 'UTF8_BOM' ? 'UTF8' : detected;
+      if (from === 'ASCII') from = 'UTF8';
+      try {
+        const unicodeArray = window.Encoding.convert(bytes, { from, to: 'UNICODE' });
+        return window.Encoding.codeToString(unicodeArray);
+      } catch (err) {
+        appendLog(`文字コード変換に失敗したためUTF-8として読み込みます: ${err.message || err}`);
+        return new TextDecoder('utf-8').decode(bytes);
+      }
+    }
+
+    function renderMappings() {
+      els.mappingArea.innerHTML = '';
+      mappingDefs.forEach(def => {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'field';
+        const select = document.createElement('select');
+        select.dataset.mapKey = def.key;
+
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = def.required ? '選択してください' : '使わない / 列なし';
+        select.appendChild(empty);
+
+        state.headers.forEach(header => {
+          const opt = document.createElement('option');
+          opt.value = header;
+          opt.textContent = header;
+          select.appendChild(opt);
+        });
+
+        const auto = findHeader(def.candidates);
+        if (auto) select.value = auto;
+
+        wrapper.appendChild(document.createTextNode(def.label + (def.required ? ' *' : '')));
+        wrapper.appendChild(select);
+        els.mappingArea.appendChild(wrapper);
+      });
+    }
+
+    function findHeader(candidates) {
+      for (const c of candidates) {
+        const exact = state.headers.find(h => h === c);
+        if (exact) return exact;
+      }
+      for (const c of candidates) {
+        const partial = state.headers.find(h => h.includes(c) || c.includes(h));
+        if (partial) return partial;
+      }
+      return '';
+    }
+
+    function getMapping() {
+      const mapping = {};
+      document.querySelectorAll('select[data-map-key]').forEach(sel => {
+        mapping[sel.dataset.mapKey] = sel.value;
+      });
+      const missing = mappingDefs.filter(d => d.required && !mapping[d.key]).map(d => d.label);
+      if (missing.length) throw new Error('必須列が未選択です: ' + missing.join(', '));
+      return mapping;
+    }
+
+    function getSettings() {
+      const offDays = new Set(Array.from(document.querySelectorAll('input[name="offday"]:checked')).map(el => Number(el.value)));
+      const start = parseTime(els.bizStart.value || '09:00');
+      const end = parseTime(els.bizEnd.value || '18:00');
+      if (!start || !end) throw new Error('営業時間の形式が不正です。');
+      if (timeToMinutes(end) <= timeToMinutes(start)) throw new Error('営業終了は営業開始より後にしてください。');
+
+      return {
+        offDays,
+        bizStart: start,
+        bizEnd: end,
+        useFallback: els.useFallback.value === 'true',
+        interviewSet: toStatusSet(els.interviewStatuses.value),
+        offerSet: toStatusSet(els.offerStatuses.value),
+        hireSet: toStatusSet(els.hireStatuses.value),
+        untouched: normalizeStatus(els.untouchedStatus.value || '未対応')
+      };
+    }
+
+    function processData() {
+      const mapping = getMapping();
+      const settings = getSettings();
+      const log = createLog();
+      const normalizedRows = normalizeRows(state.rows, mapping, settings, log);
+      const groups = groupByApplicant(normalizedRows, log);
+      const result = buildResults(groups, settings, log);
+
+      state.result = result;
+      state.workbook = createWorkbook(result, mapping, settings, log);
+      state.outputName = makeOutputName(state.file ? state.file.name : 'etl_result.csv');
+
+      renderResult(result, log);
+      els.resultCard.classList.remove('hidden');
+      els.downloadBtn.disabled = false;
+      appendLog('Excel作成完了: ' + state.outputName);
+    }
+
+    function createLog() {
+      return {
+        inputRows: state.rows.length,
+        normalizedRows: 0,
+        skippedRows: 0,
+        invalidApplyDate: 0,
+        invalidActionDate: 0,
+        noApplicantNameColumn: 0,
+        blankApplicantName: 0,
+        exactTransitions: 0,
+        groups: 0,
+        exactEvents: 0,
+        fallbackEvents: 0,
+        negativeDurationEvents: 0,
+        warnings: []
+      };
+    }
+
+    function normalizeRows(rows, mapping, settings, log) {
+      const out = [];
+      const hasApplicantNameCol = Boolean(mapping.applicantName);
+      if (!hasApplicantNameCol) {
+        log.noApplicantNameColumn = rows.length;
+        log.warnings.push('応募者名列が未選択です。テスト用の仮キーで処理します。本番では応募者名列を指定してください。');
+      }
+
+      rows.forEach((row, i) => {
+        const applyDateRaw = cell(row, mapping.applyDate);
+        const actionDateRaw = cell(row, mapping.actionDate);
+        const applyDate = parseDate(applyDateRaw);
+        const actionDate = parseDate(actionDateRaw);
+
+        if (!applyDate) log.invalidApplyDate++;
+        if (!actionDate && actionDateRaw) log.invalidActionDate++;
+        if (!applyDate) {
+          log.skippedRows++;
+          return;
+        }
+
+        const rawName = hasApplicantNameCol ? cell(row, mapping.applicantName) : '';
+        const normalizedName = normalizeName(rawName);
+        if (hasApplicantNameCol && !normalizedName) log.blankApplicantName++;
+        const applyMonth = formatMonth(applyDate);
+        const fallbackName = `__NO_NAME_ROW_${i + 2}`;
+        const nameForKey = normalizedName || fallbackName;
+        const applicantKey = `${applyMonth}_${nameForKey}`;
+
+        const content = cell(row, mapping.content);
+        const transition = parseTransition(content);
+        if (transition) log.exactTransitions++;
+
+        out.push({
+          rowNo: i + 2,
+          raw: row,
+          applyDateRaw,
+          actionDateRaw,
+          applyDate,
+          actionDate,
+          applyMonth,
+          applicantName: rawName,
+          applicantNameNormalized: normalizedName || (hasApplicantNameCol ? '' : '(応募者名列なし)'),
+          applicantKey,
+          jobNo: cell(row, mapping.jobNo),
+          jobTitle: cell(row, mapping.jobTitle),
+          status: normalizeStatus(cell(row, mapping.status)),
+          content,
+          category: cell(row, mapping.category),
+          transition
+        });
+      });
+
+      log.normalizedRows = out.length;
+      return out;
+    }
+
+    function groupByApplicant(rows, log) {
+      const map = new Map();
+      rows.forEach(r => {
+        if (!map.has(r.applicantKey)) map.set(r.applicantKey, []);
+        map.get(r.applicantKey).push(r);
+      });
+      log.groups = map.size;
+      return Array.from(map.entries()).map(([key, list]) => {
+        list.sort(compareRowsByActionThenRow);
+        return { key, rows: list };
+      });
+    }
+
+    function buildResults(groups, settings, log) {
+      const summaries = [];
+      const events = [];
+
+      groups.forEach(group => {
+        const rows = group.rows;
+        const base = getBaseApplication(rows, settings);
+        const eventMap = {
+          firstAction: findEvent(rows, settings, log, '初回アクション', (from, to) => from === settings.untouched && to !== settings.untouched, (status) => status && status !== settings.untouched),
+          interview: findEvent(rows, settings, log, '面接以上到達', (from, to) => settings.interviewSet.has(to) && !settings.interviewSet.has(from), (status) => settings.interviewSet.has(status)),
+          offer: findEvent(rows, settings, log, '内定以上到達', (from, to) => settings.offerSet.has(to) && !settings.offerSet.has(from), (status) => settings.offerSet.has(status)),
+          hire: findEvent(rows, settings, log, '採用以上到達', (from, to) => settings.hireSet.has(to) && !settings.hireSet.has(from), (status) => settings.hireSet.has(status))
+        };
+
+        const applicationEvent = makeEventRow(base, '応募', base.applyDate, '', '', '', 0, 0, 'base', settings);
+        events.push(applicationEvent);
+
+        const firstActionEvent = addOptionalEvent(events, base, eventMap.firstAction, '初回アクション', settings, log);
+        const interviewEvent = addOptionalEvent(events, base, eventMap.interview, '面接以上到達', settings, log);
+        const offerEvent = addOptionalEvent(events, base, eventMap.offer, '内定以上到達', settings, log);
+        const hireEvent = addOptionalEvent(events, base, eventMap.hire, '採用以上到達', settings, log);
+
+        summaries.push(makeSummaryRow(base, rows, firstActionEvent, interviewEvent, offerEvent, hireEvent, settings));
+      });
+
+      summaries.sort((a, b) => String(a['応募日時']).localeCompare(String(b['応募日時'])));
+      events.sort((a, b) => {
+        const m = String(a['応募日時']).localeCompare(String(b['応募日時']));
+        if (m !== 0) return m;
+        return String(a['イベント日時']).localeCompare(String(b['イベント日時']));
+      });
+
+      return { summaries, events };
+    }
+
+    function getBaseApplication(rows, settings) {
+      const byApply = rows.slice().sort((a, b) => {
+        const diff = a.applyDate - b.applyDate;
+        if (diff !== 0) return diff;
+        return a.rowNo - b.rowNo;
+      });
+      const first = byApply[0];
+      const timing = getTimingInfo(first.applyDate, settings);
+      return {
+        applicantKey: first.applicantKey,
+        applyMonth: first.applyMonth,
+        applicantName: first.applicantName,
+        applicantNameNormalized: first.applicantNameNormalized,
+        jobNo: first.jobNo,
+        jobTitle: first.jobTitle,
+        applyDate: first.applyDate,
+        applyTiming: timing
+      };
+    }
+
+    function findEvent(rows, settings, log, label, exactPredicate, fallbackPredicate) {
+      const exactCandidates = rows
+        .filter(r => r.actionDate && r.transition && exactPredicate(normalizeStatus(r.transition.from), normalizeStatus(r.transition.to)))
+        .sort(compareRowsByActionThenRow);
+
+      if (exactCandidates.length) {
+        const row = exactCandidates[0];
+        log.exactEvents++;
+        return {
+          row,
+          date: row.actionDate,
+          status: normalizeStatus(row.transition.to),
+          fromStatus: normalizeStatus(row.transition.from),
+          toStatus: normalizeStatus(row.transition.to),
+          method: 'exact'
+        };
+      }
+
+      if (!settings.useFallback) return null;
+
+      const fallbackCandidates = rows
+        .filter(r => r.actionDate && fallbackPredicate(r.status) && !isMemoOnly(r.content))
+        .sort(compareRowsByActionThenRow);
+
+      if (fallbackCandidates.length) {
+        const row = fallbackCandidates[0];
+        log.fallbackEvents++;
+        return {
+          row,
+          date: row.actionDate,
+          status: row.status,
+          fromStatus: '',
+          toStatus: row.status,
+          method: 'fallback'
+        };
+      }
+
+      return null;
+    }
+
+    function addOptionalEvent(events, base, found, eventType, settings, log) {
+      if (!found) return null;
+      const elapsedAll = diffMinutes(base.applyDate, found.date);
+      const elapsedBiz = businessMinutesBetween(base.applyDate, found.date, settings);
+      if (elapsedAll < 0) log.negativeDurationEvents++;
+      const row = makeEventRow(
+        base,
+        eventType,
+        found.date,
+        found.status,
+        found.fromStatus,
+        found.toStatus,
+        elapsedAll,
+        elapsedBiz,
+        found.method,
+        settings
+      );
+      events.push(row);
+      return row;
+    }
+
+    function makeEventRow(base, eventType, eventDate, status, fromStatus, toStatus, elapsedAll, elapsedBiz, method, settings) {
+      const eventTiming = getTimingInfo(eventDate, settings);
+      return {
+        '応募者キー': base.applicantKey,
+        '応募月': base.applyMonth,
+        '応募者名': base.applicantName,
+        '応募者名_正規化': base.applicantNameNormalized,
+        '代表仕事番号': base.jobNo,
+        '代表仕事名': base.jobTitle,
+        '応募日時': formatDateTime(base.applyDate),
+        '応募日': formatDate(base.applyDate),
+        '応募曜日': weekdayLabel(base.applyDate),
+        '応募曜日番号': weekdayNumber(base.applyDate),
+        '応募時刻': formatTime(base.applyDate),
+        '応募日_非稼働日フラグ': base.applyTiming.isOffDay ? 1 : 0,
+        '応募日_営業時間内フラグ': base.applyTiming.isBusinessTime ? 1 : 0,
+        '応募タイミング区分': base.applyTiming.category,
+        'イベント種別': eventType,
+        'イベント日時': formatDateTime(eventDate),
+        'イベント日': formatDate(eventDate),
+        'イベント曜日': weekdayLabel(eventDate),
+        'イベント曜日番号': weekdayNumber(eventDate),
+        'イベント時刻': formatTime(eventDate),
+        'イベントステータス': status,
+        '変更前ステータス': fromStatus,
+        '変更後ステータス': toStatus,
+        '経過分_全時間': elapsedAll,
+        '経過時間_全時間': minutesToDisplay(elapsedAll),
+        '経過分_営業時間内': elapsedBiz,
+        '経過時間_営業時間内': minutesToDisplay(elapsedBiz),
+        'イベント日_非稼働日フラグ': eventTiming.isOffDay ? 1 : 0,
+        'イベント日_営業時間内フラグ': eventTiming.isBusinessTime ? 1 : 0,
+        'イベントタイミング区分': eventTiming.category,
+        '判定方式': method,
+        'カウント': 1
+      };
+    }
+
+    function makeSummaryRow(base, rows, firstAction, interview, offer, hire, settings) {
+      return {
+        '応募者キー': base.applicantKey,
+        '応募月': base.applyMonth,
+        '応募者名': base.applicantName,
+        '応募者名_正規化': base.applicantNameNormalized,
+        '代表仕事番号': base.jobNo,
+        '代表仕事名': base.jobTitle,
+        '応募日時': formatDateTime(base.applyDate),
+        '応募日': formatDate(base.applyDate),
+        '応募曜日': weekdayLabel(base.applyDate),
+        '応募曜日番号': weekdayNumber(base.applyDate),
+        '応募時刻': formatTime(base.applyDate),
+        '応募日_非稼働日フラグ': base.applyTiming.isOffDay ? 1 : 0,
+        '応募日_営業時間内フラグ': base.applyTiming.isBusinessTime ? 1 : 0,
+        '応募タイミング区分': base.applyTiming.category,
+        '初回アクション有無': firstAction ? 1 : 0,
+        '初回アクション日時': firstAction ? firstAction['イベント日時'] : '',
+        '初回アクションステータス': firstAction ? firstAction['イベントステータス'] : '',
+        '初回アクション経過分_全時間': firstAction ? firstAction['経過分_全時間'] : '',
+        '初回アクション経過時間_全時間': firstAction ? firstAction['経過時間_全時間'] : '',
+        '初回アクション経過分_営業時間内': firstAction ? firstAction['経過分_営業時間内'] : '',
+        '初回アクション経過時間_営業時間内': firstAction ? firstAction['経過時間_営業時間内'] : '',
+        '初回アクション判定方式': firstAction ? firstAction['判定方式'] : '',
+        '面接以上有無': interview ? 1 : 0,
+        '面接以上日時': interview ? interview['イベント日時'] : '',
+        '面接以上ステータス': interview ? interview['イベントステータス'] : '',
+        '面接以上経過分_全時間': interview ? interview['経過分_全時間'] : '',
+        '面接以上経過分_営業時間内': interview ? interview['経過分_営業時間内'] : '',
+        '面接以上判定方式': interview ? interview['判定方式'] : '',
+        '内定以上有無': offer ? 1 : 0,
+        '内定以上日時': offer ? offer['イベント日時'] : '',
+        '内定以上ステータス': offer ? offer['イベントステータス'] : '',
+        '内定以上経過分_全時間': offer ? offer['経過分_全時間'] : '',
+        '内定以上経過分_営業時間内': offer ? offer['経過分_営業時間内'] : '',
+        '内定以上判定方式': offer ? offer['判定方式'] : '',
+        '採用以上有無': hire ? 1 : 0,
+        '採用以上日時': hire ? hire['イベント日時'] : '',
+        '採用以上ステータス': hire ? hire['イベントステータス'] : '',
+        '採用以上経過分_全時間': hire ? hire['経過分_全時間'] : '',
+        '採用以上経過分_営業時間内': hire ? hire['経過分_営業時間内'] : '',
+        '採用以上判定方式': hire ? hire['判定方式'] : '',
+        '履歴行数': rows.length,
+        '集計設定_非稼働曜日': offDayLabels(settings).join(','),
+        '集計設定_営業開始': timeObjectToString(settings.bizStart),
+        '集計設定_営業終了': timeObjectToString(settings.bizEnd)
+      };
+    }
+
+    function createWorkbook(result, mapping, settings, log) {
+      const wb = window.XLSX.utils.book_new();
+      appendSheet(wb, '01_応募者サマリー', result.summaries);
+      appendSheet(wb, '02_ピボット用イベント', result.events);
+      appendSheet(wb, '03_集計設定', buildSettingsSheet(mapping, settings));
+      appendSheet(wb, '04_処理ログ・注意点', buildLogSheet(log));
+      return wb;
+    }
+
+    function appendSheet(wb, name, data) {
+      const rows = data && data.length ? data : [{ 'メッセージ': '該当データなし' }];
+      const ws = window.XLSX.utils.json_to_sheet(rows);
+      const range = window.XLSX.utils.decode_range(ws['!ref']);
+      ws['!autofilter'] = { ref: ws['!ref'] };
+      ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+      ws['!cols'] = inferColumnWidths(rows, range);
+      window.XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+    }
+
+    function buildSettingsSheet(mapping, settings) {
+      return [
+        { '項目': '出力日時', '値': formatDateTime(new Date()), '補足': '' },
+        { '項目': '入力ファイル名', '値': state.file ? state.file.name : '', '補足': '' },
+        { '項目': '推定文字コード', '値': state.encoding, '補足': '出力はxlsxのため文字コード差は基本的に意識不要' },
+        { '項目': '応募者キー', '値': '応募月 + 応募者名_正規化', '補足': '応募者名列が未選択の場合はテスト用仮キー' },
+        { '項目': '非稼働曜日', '値': offDayLabels(settings).join(','), '補足': '' },
+        { '項目': '営業開始', '値': timeObjectToString(settings.bizStart), '補足': '' },
+        { '項目': '営業終了', '値': timeObjectToString(settings.bizEnd), '補足': '' },
+        { '項目': '旧データfallback判定', '値': settings.useFallback ? '使う' : '使わない', '補足': '対応内容にステータス遷移が無い場合、対応ステータス名から推定' },
+        { '項目': '未対応ステータス', '値': settings.untouched, '補足': '' },
+        { '項目': '面接以上ステータス', '値': Array.from(settings.interviewSet).join(','), '補足': '' },
+        { '項目': '内定以上ステータス', '値': Array.from(settings.offerSet).join(','), '補足': '' },
+        { '項目': '採用以上ステータス', '値': Array.from(settings.hireSet).join(','), '補足': '' },
+        ...mappingDefs.map(def => ({ '項目': `列マッピング_${def.label}`, '値': mapping[def.key] || '', '補足': def.required ? '必須' : '' }))
+      ];
+    }
+
+    function buildLogSheet(log) {
+      const rows = [
+        { '項目': '入力行数', '値': log.inputRows, '補足': '' },
+        { '項目': '処理対象行数', '値': log.normalizedRows, '補足': '応募日付が正常に読めた行' },
+        { '項目': 'スキップ行数', '値': log.skippedRows, '補足': '主に応募日付不正' },
+        { '項目': '応募者キー数', '値': log.groups, '補足': '応募月 + 応募者名' },
+        { '項目': '応募日付変換失敗', '値': log.invalidApplyDate, '補足': '' },
+        { '項目': '対応日付変換失敗', '値': log.invalidActionDate, '補足': '' },
+        { '項目': '応募者名列なし行数', '値': log.noApplicantNameColumn, '補足': '' },
+        { '項目': '応募者名空欄行数', '値': log.blankApplicantName, '補足': '' },
+        { '項目': '対応状態変更の抽出件数', '値': log.exactTransitions, '補足': '対応内容から変更前/変更後を抽出できた件数' },
+        { '項目': 'exactイベント件数', '値': log.exactEvents, '補足': '対応内容の変更前/変更後から判定' },
+        { '項目': 'fallbackイベント件数', '値': log.fallbackEvents, '補足': '対応ステータス名から推定' },
+        { '項目': '負の経過時間イベント件数', '値': log.negativeDurationEvents, '補足': '対応日付が応募日付より前の可能性' }
+      ];
+      log.warnings.forEach((w, i) => rows.push({ '項目': `警告${i + 1}`, '値': w, '補足': '' }));
+      return rows;
+    }
+
+    function renderResult(result, log) {
+      const counts = countBy(result.events, 'イベント種別');
+      els.summaryPills.innerHTML = '';
+      addPill(`応募 ${counts['応募'] || 0}`, 'ok');
+      addPill(`初回アクション ${counts['初回アクション'] || 0}`, 'ok');
+      addPill(`面接以上 ${counts['面接以上到達'] || 0}`, 'ok');
+      addPill(`内定以上 ${counts['内定以上到達'] || 0}`, 'ok');
+      addPill(`採用以上 ${counts['採用以上到達'] || 0}`, 'ok');
+      addPill(`exact ${log.exactEvents}`, 'warn');
+      addPill(`fallback ${log.fallbackEvents}`, log.fallbackEvents ? 'warn' : 'ok');
+
+      renderPreview(result.events.slice(0, 100));
+      appendLog([
+        `応募者キー数: ${log.groups}`,
+        `イベント行数: ${result.events.length}`,
+        `サマリー行数: ${result.summaries.length}`,
+        `exactイベント: ${log.exactEvents}`,
+        `fallbackイベント: ${log.fallbackEvents}`,
+        log.warnings.length ? `警告: ${log.warnings.join(' / ')}` : '警告: なし'
+      ].join('\n'));
+    }
+
+    function addPill(text, type) {
+      const span = document.createElement('span');
+      span.className = `pill ${type || ''}`;
+      span.textContent = text;
+      els.summaryPills.appendChild(span);
+    }
+
+    function renderPreview(rows) {
+      if (!rows.length) {
+        els.previewArea.innerHTML = '<div style="padding:14px;">プレビュー対象データがありません。</div>';
+        return;
+      }
+      const headers = Object.keys(rows[0]);
+      let html = '<table><thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
+      html += rows.map(row => '<tr>' + headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('') + '</tr>').join('');
+      html += '</tbody></table>';
+      els.previewArea.innerHTML = html;
+    }
+
+    function appendLog(message) {
+      els.logCard.classList.remove('hidden');
+      const stamp = formatDateTime(new Date());
+      els.logArea.textContent += `[${stamp}] ${message}\n`;
+      els.logArea.scrollTop = els.logArea.scrollHeight;
+    }
+
+    function resetAll() {
+      state.file = null;
+      state.encoding = '';
+      state.text = '';
+      state.headers = [];
+      state.rows = [];
+      state.result = null;
+      state.workbook = null;
+      state.outputName = '';
+      els.fileInput.value = '';
+      els.fileMeta.textContent = '未読み込み';
+      els.mappingCard.classList.add('hidden');
+      els.settingsCard.classList.add('hidden');
+      els.resultCard.classList.add('hidden');
+      els.processBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      els.mappingArea.innerHTML = '';
+      els.previewArea.innerHTML = '';
+      els.summaryPills.innerHTML = '';
+      els.logArea.textContent = '';
+      els.logCard.classList.add('hidden');
+    }
+
+    function resetResultOnly() {
+      state.result = null;
+      state.workbook = null;
+      state.outputName = '';
+      els.resultCard.classList.add('hidden');
+      els.downloadBtn.disabled = true;
+      els.previewArea.innerHTML = '';
+      els.summaryPills.innerHTML = '';
+    }
+
+    function parseTransition(content) {
+      const s = String(content || '').replace(/<br\s*\/?>/gi, '\n');
+      const patterns = [
+        /対応状態を[「"]([^」"]*)[」"]から[「"]([^」"]*)[」"]に変更/,
+        /対応ステータスを[「"]([^」"]*)[」"]から[「"]([^」"]*)[」"]に変更/,
+        /ステータスを[「"]([^」"]*)[」"]から[「"]([^」"]*)[」"]に変更/
+      ];
+      for (const pat of patterns) {
+        const m = s.match(pat);
+        if (m) return { from: normalizeStatus(m[1]), to: normalizeStatus(m[2]) };
+      }
+      return null;
+    }
+
+    function isMemoOnly(content) {
+      const s = String(content || '');
+      if (!s) return false;
+      const hasStatusChange = parseTransition(s);
+      if (hasStatusChange) return false;
+      const memoWords = ['備考を', 'メモを', 'コメントを', '社内メモ', '応募詳細'];
+      const actionWords = ['メール', 'TEL', '電話', '面接', '内定', '採用', '入社', '不採用', '辞退', '連絡'];
+      return memoWords.some(w => s.includes(w)) && !actionWords.some(w => s.includes(w));
+    }
+
+    function businessMinutesBetween(start, end, settings) {
+      if (!(start instanceof Date) || !(end instanceof Date) || isNaN(start) || isNaN(end)) return '';
+      if (end <= start) return Math.round((end - start) / 60000);
+
+      let total = 0;
+      const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+      while (cursor <= last) {
+        const day = cursor.getDay();
+        if (!settings.offDays.has(day)) {
+          const dayStart = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), settings.bizStart.h, settings.bizStart.m, 0, 0);
+          const dayEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), settings.bizEnd.h, settings.bizEnd.m, 0, 0);
+          const overlapStart = maxDate(start, dayStart);
+          const overlapEnd = minDate(end, dayEnd);
+          if (overlapEnd > overlapStart) total += (overlapEnd - overlapStart) / 60000;
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return Math.round(total);
+    }
+
+    function getTimingInfo(date, settings) {
+      const isOffDay = settings.offDays.has(date.getDay());
+      const minutes = date.getHours() * 60 + date.getMinutes();
+      const start = timeToMinutes(settings.bizStart);
+      const end = timeToMinutes(settings.bizEnd);
+      const isBusinessTime = !isOffDay && minutes >= start && minutes < end;
+      let category = '営業日・営業時間外';
+      if (isOffDay) category = '非稼働日';
+      else if (isBusinessTime) category = '営業日・営業時間内';
+      return { isOffDay, isBusinessTime, category };
+    }
+
+    function parseDate(value) {
+      if (value instanceof Date && !isNaN(value)) return value;
+      let s = String(value || '').trim();
+      if (!s) return null;
+      s = s.replace(/\u3000/g, ' ')
+           .replace(/[年月]/g, '/')
+           .replace(/日/g, '')
+           .replace('T', ' ')
+           .replace(/\s+/g, ' ')
+           .replace(/-/g, '/');
+      const m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+      if (!m) return null;
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      const h = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const sec = Number(m[6] || 0);
+      const dt = new Date(y, mo - 1, d, h, mi, sec, 0);
+      if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+      return dt;
+    }
+
+    function parseTime(value) {
+      const m = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      const h = Number(m[1]);
+      const mm = Number(m[2]);
+      if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+      return { h, m: mm };
+    }
+
+    function timeToMinutes(t) { return t.h * 60 + t.m; }
+    function maxDate(a, b) { return a > b ? a : b; }
+    function minDate(a, b) { return a < b ? a : b; }
+    function diffMinutes(a, b) { return Math.round((b - a) / 60000); }
+
+    function compareRowsByActionThenRow(a, b) {
+      const ad = a.actionDate ? a.actionDate.getTime() : Number.POSITIVE_INFINITY;
+      const bd = b.actionDate ? b.actionDate.getTime() : Number.POSITIVE_INFINITY;
+      if (ad !== bd) return ad - bd;
+      return a.rowNo - b.rowNo;
+    }
+
+    function cell(row, col) {
+      if (!col) return '';
+      return String(row[col] ?? '').trim();
+    }
+
+    function normalizeName(name) {
+      return String(name || '')
+        .replace(/\u3000/g, ' ')
+        .replace(/\s+/g, '')
+        .trim();
+    }
+
+    function normalizeStatus(status) {
+      return String(status || '')
+        .replace(/\u3000/g, ' ')
+        .replace(/\s+/g, '')
+        .trim();
+    }
+
+    function toStatusSet(value) {
+      return new Set(String(value || '')
+        .split(/[、,\n]/)
+        .map(normalizeStatus)
+        .filter(Boolean));
+    }
+
+    function formatDateTime(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      return `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    }
+
+    function formatDate(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      return `${date.getFullYear()}/${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}`;
+    }
+
+    function formatMonth(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+    }
+
+    function formatTime(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+    }
+
+    function weekdayLabel(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      return weekdays[date.getDay()].label;
+    }
+
+    function weekdayNumber(date) {
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      const d = date.getDay();
+      return d === 0 ? 7 : d;
+    }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function minutesToDisplay(minutes) {
+      if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '';
+      const sign = Number(minutes) < 0 ? '-' : '';
+      let n = Math.abs(Number(minutes));
+      const days = Math.floor(n / 1440);
+      n -= days * 1440;
+      const hours = Math.floor(n / 60);
+      const mins = n - hours * 60;
+      if (days > 0) return `${sign}${days}日${hours}時間${mins}分`;
+      if (hours > 0) return `${sign}${hours}時間${mins}分`;
+      return `${sign}${mins}分`;
+    }
+
+    function timeObjectToString(t) {
+      return `${pad2(t.h)}:${pad2(t.m)}`;
+    }
+
+    function offDayLabels(settings) {
+      return weekdays.filter(d => settings.offDays.has(d.value)).map(d => d.label);
+    }
+
+    function countBy(rows, key) {
+      return rows.reduce((acc, row) => {
+        const v = row[key] || '';
+        acc[v] = (acc[v] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function inferColumnWidths(rows, range) {
+      const headers = Object.keys(rows[0] || {});
+      return headers.map(h => {
+        let max = String(h).length;
+        for (let i = 0; i < Math.min(rows.length, 200); i++) {
+          max = Math.max(max, String(rows[i][h] ?? '').length);
+        }
+        return { wch: Math.min(Math.max(max + 2, 10), 48) };
+      });
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function makeOutputName(inputName) {
+      const base = inputName.replace(/\.[^.]+$/, '') || 'etl_result';
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}`;
+      return `${base}_etl_result_${stamp}.xlsx`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
