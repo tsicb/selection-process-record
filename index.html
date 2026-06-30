@@ -37,6 +37,7 @@
 
     body {
       margin: 0;
+      overflow-x: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
       background:
         radial-gradient(circle at top left, rgba(37, 99, 235, .10), transparent 30%),
@@ -68,6 +69,7 @@
 
     main {
       max-width: 1180px;
+      min-width: 0;
       margin: 0 auto 56px;
       padding: 0 22px;
       display: grid;
@@ -75,6 +77,8 @@
     }
 
     .card {
+      min-width: 0;
+      max-width: 100%;
       background: rgba(255,255,255,.92);
       border: 1px solid rgba(219, 227, 239, .9);
       border-radius: var(--radius);
@@ -277,11 +281,19 @@
     .pill.danger { background: #fee2e2; color: var(--danger); }
 
     .preview {
-      overflow: auto;
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: auto;
       max-height: 420px;
       border: 1px solid var(--line);
       border-radius: 14px;
       background: #fff;
+    }
+
+    .preview table {
+      width: max-content;
+      min-width: 100%;
     }
 
     table {
@@ -348,7 +360,9 @@
 
     <section id="mappingCard" class="card hidden">
       <h2>2. 列マッピング確認</h2>
-      <p class="small-note">自動判定しています。列名が異なる場合は、ここで変更してください。</p>
+      <p class="small-note">
+        列マッピングは、入力CSVの各列を「応募日付」「対応日付」「対応ステータス名」など、アプリ内部で使う役割に対応させるための設定です。出力列を選ぶためではありません。列名が標準と違うCSVでも、ここを合わせれば同じ処理で読み込めます。
+      </p>
       <div id="mappingArea" class="mapping-grid"></div>
     </section>
 
@@ -450,6 +464,7 @@
       { key: 'jobNo', label: '仕事番号列', required: false, candidates: ['仕事番号', '求人番号', '管理番号'] },
       { key: 'jobTitle', label: '仕事名列', required: false, candidates: ['仕事名', '求人名', '職種名', 'タイトル'] },
       { key: 'actionDate', label: '対応日付列', required: true, candidates: ['対応日付', '対応日時', '更新日時', '処理日付'] },
+      { key: 'updateUser', label: '更新ユーザー名列', required: false, candidates: ['更新ユーザー名', '更新ユーザー', '更新者', '対応者', 'ユーザー名'] },
       { key: 'status', label: '対応ステータス名列', required: true, candidates: ['対応ステータス名', 'ステータス名', '対応状態', 'ステータス'] },
       { key: 'content', label: '対応内容列', required: false, candidates: ['対応内容', '内容', '履歴内容', '更新内容'] },
       { key: 'category', label: '区分列', required: false, candidates: ['区分', '種別'] }
@@ -770,6 +785,7 @@
           applicantKey,
           jobNo: cell(row, mapping.jobNo),
           jobTitle: cell(row, mapping.jobTitle),
+          updateUser: cell(row, mapping.updateUser),
           status: normalizeStatus(cell(row, mapping.status)),
           content,
           category: cell(row, mapping.category),
@@ -808,7 +824,7 @@
           hire: findEvent(rows, settings, log, '採用以上到達', (from, to) => settings.hireSet.has(to) && !settings.hireSet.has(from), (status) => settings.hireSet.has(status))
         };
 
-        const applicationEvent = makeEventRow(base, '応募', base.applyDate, '', '', '', 0, 0, 'base', settings);
+        const applicationEvent = makeEventRow(base, '応募', base.applyDate, '', '', '', '', 0, 0, 'base', settings);
         events.push(applicationEvent);
 
         const firstActionEvent = addOptionalEvent(events, base, eventMap.firstAction, '初回アクション', settings, log);
@@ -901,6 +917,7 @@
         found.status,
         found.fromStatus,
         found.toStatus,
+        found.row ? found.row.updateUser : '',
         elapsedAll,
         elapsedBiz,
         found.method,
@@ -910,7 +927,7 @@
       return row;
     }
 
-    function makeEventRow(base, eventType, eventDate, status, fromStatus, toStatus, elapsedAll, elapsedBiz, method, settings) {
+    function makeEventRow(base, eventType, eventDate, status, fromStatus, toStatus, updateUser, elapsedAll, elapsedBiz, method, settings) {
       const eventTiming = getTimingInfo(eventDate, settings);
       return {
         '応募者キー': base.applicantKey,
@@ -933,6 +950,7 @@
         'イベント曜日': weekdayLabel(eventDate),
         'イベント曜日番号': weekdayNumber(eventDate),
         'イベント時刻': formatTime(eventDate),
+        '更新ユーザー名': updateUser,
         'イベントステータス': status,
         '変更前ステータス': fromStatus,
         '変更後ステータス': toStatus,
@@ -967,6 +985,7 @@
         '初回アクション有無': firstAction ? 1 : 0,
         '初回アクション日時': firstAction ? firstAction['イベント日時'] : '',
         '初回アクションステータス': firstAction ? firstAction['イベントステータス'] : '',
+        '初回アクション更新ユーザー名': firstAction ? firstAction['更新ユーザー名'] : '',
         '初回アクション経過分_全時間': firstAction ? firstAction['経過分_全時間'] : '',
         '初回アクション経過時間_全時間': firstAction ? firstAction['経過時間_全時間'] : '',
         '初回アクション経過分_営業時間内': firstAction ? firstAction['経過分_営業時間内'] : '',
@@ -975,18 +994,21 @@
         '面接以上有無': interview ? 1 : 0,
         '面接以上日時': interview ? interview['イベント日時'] : '',
         '面接以上ステータス': interview ? interview['イベントステータス'] : '',
+        '面接以上更新ユーザー名': interview ? interview['更新ユーザー名'] : '',
         '面接以上経過分_全時間': interview ? interview['経過分_全時間'] : '',
         '面接以上経過分_営業時間内': interview ? interview['経過分_営業時間内'] : '',
         '面接以上判定方式': interview ? interview['判定方式'] : '',
         '内定以上有無': offer ? 1 : 0,
         '内定以上日時': offer ? offer['イベント日時'] : '',
         '内定以上ステータス': offer ? offer['イベントステータス'] : '',
+        '内定以上更新ユーザー名': offer ? offer['更新ユーザー名'] : '',
         '内定以上経過分_全時間': offer ? offer['経過分_全時間'] : '',
         '内定以上経過分_営業時間内': offer ? offer['経過分_営業時間内'] : '',
         '内定以上判定方式': offer ? offer['判定方式'] : '',
         '採用以上有無': hire ? 1 : 0,
         '採用以上日時': hire ? hire['イベント日時'] : '',
         '採用以上ステータス': hire ? hire['イベントステータス'] : '',
+        '採用以上更新ユーザー名': hire ? hire['更新ユーザー名'] : '',
         '採用以上経過分_全時間': hire ? hire['経過分_全時間'] : '',
         '採用以上経過分_営業時間内': hire ? hire['経過分_営業時間内'] : '',
         '採用以上判定方式': hire ? hire['判定方式'] : '',
