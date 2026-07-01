@@ -624,39 +624,50 @@
     .page.hidden { display: none !important; }
 
     .result-page {
-      max-width: 100%;
-      padding: 0 22px 56px;
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      width: 100vw;
+      height: 100vh;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(37, 99, 235, .08), transparent 28%),
+        radial-gradient(circle at 94% 8%, rgba(15, 118, 110, .08), transparent 32%),
+        #f3f6fb;
     }
 
     .result-shell {
-      max-width: 1440px;
-      margin: 0 auto;
+      width: 100%;
+      height: 100%;
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      gap: 18px;
-      align-items: start;
+      grid-template-columns: 304px minmax(0, 1fr);
+      gap: 0;
+      align-items: stretch;
+      transition: grid-template-columns .18s ease;
     }
 
     .result-shell.sidebar-collapsed {
-      grid-template-columns: 58px minmax(0, 1fr);
+      grid-template-columns: 64px minmax(0, 1fr);
     }
 
     .result-sidebar {
-      position: sticky;
-      top: 18px;
-      max-height: calc(100vh - 36px);
-      overflow: auto;
-      background: rgba(255,255,255,.94);
-      border: 1px solid rgba(219, 227, 239, .95);
-      border-radius: 22px;
-      box-shadow: var(--shadow);
-      padding: 16px;
-      transition: .18s ease;
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0f172a, #111827 58%, #111f2c);
+      color: #e5edf8;
+      border-right: 1px solid rgba(148, 163, 184, .28);
+      box-shadow: 10px 0 28px rgba(15, 23, 42, .10);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      transition: padding .18s ease;
     }
 
     .result-shell.sidebar-collapsed .result-sidebar {
-      padding: 10px;
-      overflow: hidden;
+      padding: 10px 8px;
     }
 
     .result-sidebar-header {
@@ -664,109 +675,242 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      margin-bottom: 14px;
+      padding: 2px 2px 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, .22);
+      margin-bottom: 12px;
+      min-height: 50px;
     }
 
-    .result-sidebar-header h2 {
-      margin: 0;
-      font-size: 17px;
+    .result-sidebar-brand {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-mark {
+      flex: 0 0 auto;
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #2563eb, #0f766e);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: .02em;
+      box-shadow: 0 10px 22px rgba(37, 99, 235, .25);
+    }
+
+    .brand-copy {
+      min-width: 0;
+      display: grid;
+      line-height: 1.25;
+    }
+
+    .brand-copy strong {
+      font-size: 14px;
+      letter-spacing: .02em;
+      color: #ffffff;
+    }
+
+    .brand-copy span {
+      font-size: 11px;
+      color: #9fb0c7;
     }
 
     .sidebar-toggle {
       flex: 0 0 auto;
-      width: 38px;
-      height: 38px;
+      width: 34px;
+      height: 34px;
       padding: 0;
       display: inline-grid;
       place-items: center;
-      border-radius: 999px;
-      background: #334155;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .08);
+      color: #e5edf8;
       box-shadow: none;
+      border: 1px solid rgba(148, 163, 184, .20);
     }
 
-    .result-shell.sidebar-collapsed .result-sidebar-content,
-    .result-shell.sidebar-collapsed .result-sidebar-header h2 {
+    .sidebar-toggle:hover {
+      background: rgba(255, 255, 255, .14);
+    }
+
+    .result-shell.sidebar-collapsed .brand-copy,
+    .result-shell.sidebar-collapsed .result-sidebar-content {
       display: none;
     }
 
     .result-shell.sidebar-collapsed .result-sidebar-header {
       justify-content: center;
-      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .result-shell.sidebar-collapsed .sidebar-toggle {
+      position: absolute;
+      top: 58px;
+      left: 15px;
+      width: 34px;
+      height: 34px;
     }
 
     .result-sidebar-content {
+      min-height: 0;
+      flex: 1;
       display: grid;
-      gap: 14px;
+      grid-template-rows: auto auto auto auto auto auto;
+      gap: 9px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 2px;
+      scrollbar-width: thin;
     }
 
     .sidebar-block {
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: linear-gradient(180deg, #ffffff, #fbfdff);
-      padding: 12px;
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 14px;
+      background: rgba(255,255,255,.06);
+      padding: 10px;
       display: grid;
-      gap: 10px;
+      gap: 8px;
+      min-width: 0;
     }
 
     .sidebar-block-title {
       margin: 0;
-      font-size: 13px;
-      font-weight: 800;
-      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .03em;
+      color: #c7d2e4;
+    }
+
+    .result-sidebar .field {
+      color: #dbe7f5;
+      font-size: 12px;
+      gap: 4px;
+    }
+
+    .result-sidebar select,
+    .result-sidebar input[type="time"],
+    .result-sidebar input[type="text"],
+    .result-sidebar input[type="number"] {
+      min-height: 36px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border-color: rgba(148, 163, 184, .25);
+      background: rgba(15, 23, 42, .70);
+      color: #f8fafc;
+    }
+
+    .result-sidebar select option {
+      color: #0f172a;
+      background: #ffffff;
     }
 
     .sidebar-weekdays {
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 5px;
+      gap: 4px;
     }
 
     .sidebar-weekdays .check-card {
-      padding: 7px 3px;
+      padding: 6px 2px;
+      font-size: 11px;
+      border-color: rgba(148, 163, 184, .22);
+      color: #dbe7f5;
+      background: rgba(15, 23, 42, .48);
+      border-radius: 10px;
+    }
+
+    .sidebar-weekdays .check-card input {
+      display: none;
+    }
+
+    .sidebar-weekdays .check-card:has(input:checked) {
+      background: rgba(37, 99, 235, .30);
+      border-color: rgba(96, 165, 250, .55);
+      color: #ffffff;
+    }
+
+    .result-sidebar .toggle-list {
+      gap: 6px;
+    }
+
+    .result-sidebar .toggle-row {
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, .44);
+      color: #dbe7f5;
+      border-color: rgba(148, 163, 184, .22);
       font-size: 12px;
+    }
+
+    .result-sidebar .toggle-row input {
+      width: 16px;
+      height: 16px;
+    }
+
+    #resultApplySettingsBtn {
+      width: 100%;
+      justify-content: center;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-top: 2px;
     }
 
     .result-main {
       min-width: 0;
+      height: 100vh;
+      overflow: auto;
       display: grid;
-      gap: 16px;
+      grid-template-rows: auto auto minmax(360px, auto) auto auto;
+      gap: 12px;
+      padding: 14px;
     }
 
     .result-topbar {
-      background: rgba(255,255,255,.94);
-      border: 1px solid rgba(219, 227, 239, .95);
-      border-radius: 22px;
-      box-shadow: var(--shadow);
-      padding: 18px 20px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(219, 227, 239, .92);
+      border-radius: 18px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+      padding: 12px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
     .result-topbar h2 {
-      margin: 0 0 4px;
-      font-size: 24px;
+      margin: 0 0 2px;
+      font-size: 22px;
+      line-height: 1.2;
     }
 
     .result-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
+    }
+
+    .result-actions button {
+      padding: 9px 14px;
     }
 
     .summary-card-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(130px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
     }
 
     .summary-card {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      padding: 16px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(219, 227, 239, .92);
+      border-radius: 16px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+      padding: 13px;
       min-width: 0;
     }
 
@@ -777,8 +921,8 @@
     }
 
     .summary-card .value {
-      font-size: 26px;
-      font-weight: 800;
+      font-size: 25px;
+      font-weight: 900;
       margin-top: 4px;
       line-height: 1.1;
     }
@@ -786,27 +930,55 @@
     .summary-card .sub {
       color: var(--muted);
       font-size: 12px;
-      margin-top: 6px;
+      margin-top: 5px;
     }
 
     .result-box {
       min-width: 0;
-      background: rgba(255,255,255,.94);
-      border: 1px solid rgba(219, 227, 239, .95);
-      border-radius: 22px;
-      box-shadow: var(--shadow);
-      padding: 18px;
+      background: rgba(255,255,255,.90);
+      border: 1px solid rgba(219, 227, 239, .92);
+      border-radius: 18px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+      padding: 14px;
     }
 
     .result-box h3 {
-      margin: 0 0 10px;
-      font-size: 18px;
+      margin: 0 0 6px;
+      font-size: 17px;
+    }
+
+    .result-box .preview {
+      max-height: min(58vh, 620px);
     }
 
     .muted-box {
-      background: rgba(248,250,252,.9);
+      background: rgba(248,250,252,.82);
       border-style: dashed;
       color: var(--muted);
+      min-height: 110px;
+    }
+
+    @media (max-height: 760px) {
+      .result-sidebar {
+        padding: 8px;
+      }
+      .result-sidebar-header {
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+      }
+      .result-sidebar-content {
+        gap: 7px;
+      }
+      .sidebar-block {
+        padding: 8px;
+        gap: 6px;
+      }
+      .result-sidebar select,
+      .result-sidebar input[type="time"],
+      .result-sidebar input[type="number"] {
+        min-height: 32px;
+        padding: 6px 8px;
+      }
     }
 
     @media (max-width: 1080px) {
@@ -816,25 +988,31 @@
       }
 
       .result-sidebar {
-        position: static;
-        max-height: none;
+        height: auto;
+        max-height: 46vh;
+        overflow: auto;
+        border-right: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, .28);
       }
 
       .result-shell.sidebar-collapsed .result-sidebar-content,
-      .result-shell.sidebar-collapsed .result-sidebar-header h2 {
+      .result-shell.sidebar-collapsed .brand-copy {
         display: grid;
       }
 
-      .result-shell.sidebar-collapsed .result-sidebar {
-        padding: 16px;
-        overflow: auto;
+      .result-shell.sidebar-collapsed .sidebar-toggle {
+        position: static;
+      }
+
+      .result-main {
+        height: auto;
+        min-height: 54vh;
       }
 
       .summary-card-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
-
     .body-lock { overflow: hidden; }
 
     @media (max-width: 720px) {
@@ -983,7 +1161,13 @@
     <div id="resultShell" class="result-shell">
       <aside id="resultSidebar" class="result-sidebar">
         <div class="result-sidebar-header">
-          <h2>集計条件</h2>
+          <div class="result-sidebar-brand">
+            <div class="brand-mark">ETL</div>
+            <div class="brand-copy">
+              <strong>応募分析</strong>
+              <span>条件設定</span>
+            </div>
+          </div>
           <button id="resultSidebarToggle" class="sidebar-toggle" type="button" title="サイドバーを開閉" aria-label="サイドバーを開閉">☰</button>
         </div>
         <div class="result-sidebar-content">
@@ -1061,7 +1245,7 @@
         <div class="result-topbar">
           <div>
             <h2>集計結果</h2>
-            <p class="small-note">表・グラフ表示のための結果ページです。サイドバーの条件を変更して再集計できます。</p>
+            <p class="small-note">サイドバーの条件を変更して再集計できます。</p>
           </div>
           <div class="result-actions">
             <button id="resultDownloadBtn" class="success" type="button" disabled>Excelをダウンロード</button>
