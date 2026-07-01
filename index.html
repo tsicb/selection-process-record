@@ -620,6 +620,221 @@
       font-size: 18px;
     }
 
+
+    .page.hidden { display: none !important; }
+
+    .result-page {
+      max-width: 100%;
+      padding: 0 22px 56px;
+    }
+
+    .result-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .result-shell.sidebar-collapsed {
+      grid-template-columns: 58px minmax(0, 1fr);
+    }
+
+    .result-sidebar {
+      position: sticky;
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(219, 227, 239, .95);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      transition: .18s ease;
+    }
+
+    .result-shell.sidebar-collapsed .result-sidebar {
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    .result-sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .result-sidebar-header h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .sidebar-toggle {
+      flex: 0 0 auto;
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #334155;
+      box-shadow: none;
+    }
+
+    .result-shell.sidebar-collapsed .result-sidebar-content,
+    .result-shell.sidebar-collapsed .result-sidebar-header h2 {
+      display: none;
+    }
+
+    .result-shell.sidebar-collapsed .result-sidebar-header {
+      justify-content: center;
+      margin-bottom: 0;
+    }
+
+    .result-sidebar-content {
+      display: grid;
+      gap: 14px;
+    }
+
+    .sidebar-block {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sidebar-block-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .sidebar-weekdays {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .sidebar-weekdays .check-card {
+      padding: 7px 3px;
+      font-size: 12px;
+    }
+
+    .result-main {
+      min-width: 0;
+      display: grid;
+      gap: 16px;
+    }
+
+    .result-topbar {
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(219, 227, 239, .95);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .result-topbar h2 {
+      margin: 0 0 4px;
+      font-size: 24px;
+    }
+
+    .result-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .summary-card-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .summary-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .summary-card .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .summary-card .value {
+      font-size: 26px;
+      font-weight: 800;
+      margin-top: 4px;
+      line-height: 1.1;
+    }
+
+    .summary-card .sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .result-box {
+      min-width: 0;
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(219, 227, 239, .95);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .result-box h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .muted-box {
+      background: rgba(248,250,252,.9);
+      border-style: dashed;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1080px) {
+      .result-shell,
+      .result-shell.sidebar-collapsed {
+        grid-template-columns: 1fr;
+      }
+
+      .result-sidebar {
+        position: static;
+        max-height: none;
+      }
+
+      .result-shell.sidebar-collapsed .result-sidebar-content,
+      .result-shell.sidebar-collapsed .result-sidebar-header h2 {
+        display: grid;
+      }
+
+      .result-shell.sidebar-collapsed .result-sidebar {
+        padding: 16px;
+        overflow: auto;
+      }
+
+      .summary-card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     .body-lock { overflow: hidden; }
 
     @media (max-width: 720px) {
@@ -644,7 +859,7 @@
     </div>
   </header>
 
-  <main>
+  <main id="inputPage" class="page">
     <section class="card">
       <h2>CSVアップロード</h2>
       <div class="upload-grid">
@@ -729,6 +944,19 @@
         </div>
 
         <div class="setting-block">
+          <p class="setting-title">有効応募年齢</p>
+          <div class="mini-grid tight">
+            <label class="field">下限
+              <input id="minValidAge" type="number" min="0" step="1" value="15" />
+            </label>
+            <label class="field">上限
+              <input id="maxValidAge" type="number" min="0" step="1" value="49" />
+            </label>
+          </div>
+          <p class="hint">応募者情報CSVに年齢がある場合、指定範囲外の応募者は集計結果から除外します。</p>
+        </div>
+
+        <div class="setting-block">
           <p class="setting-title">匿名化</p>
           <div class="toggle-list">
             <label class="toggle-row">
@@ -740,15 +968,127 @@
               <input id="anonymizeUsers" type="checkbox" />
             </label>
           </div>
-          <div id="quickStatus" class="meta">CSV読み込み後に生成できます。</div>
+          <div id="quickStatus" class="meta">CSV読み込み後に集計結果を表示できます。</div>
         </div>
       </div>
 
       <div class="toolbar quick-actions">
-        <button id="processBtn" class="success" disabled>Excelを生成・ダウンロード</button>
+        <button id="processBtn" class="success" disabled>集計結果を見る</button>
         <button id="resetBtn" class="secondary" type="button">リセット</button>
       </div>
     </section>
+  </main>
+
+  <main id="resultPage" class="page result-page hidden">
+    <div id="resultShell" class="result-shell">
+      <aside id="resultSidebar" class="result-sidebar">
+        <div class="result-sidebar-header">
+          <h2>集計条件</h2>
+          <button id="resultSidebarToggle" class="sidebar-toggle" type="button" title="サイドバーを開閉" aria-label="サイドバーを開閉">☰</button>
+        </div>
+        <div class="result-sidebar-content">
+          <div class="sidebar-block">
+            <p class="sidebar-block-title">非稼働曜日</p>
+            <div class="weekday-boxes sidebar-weekdays" id="resultWeekdayBoxes"></div>
+          </div>
+
+          <div class="sidebar-block">
+            <p class="sidebar-block-title">営業時間</p>
+            <div class="mini-grid tight">
+              <label class="field">営業開始
+                <input id="resultBizStart" type="time" value="09:00" />
+              </label>
+              <label class="field">営業終了
+                <input id="resultBizEnd" type="time" value="18:00" />
+              </label>
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <p class="sidebar-block-title">時間集計ルール</p>
+            <label class="field">時間バケット幅
+              <select id="resultBucketMinutes">
+                <option value="30">30分</option>
+                <option value="60" selected>1時間</option>
+                <option value="120">2時間</option>
+                <option value="180">3時間</option>
+                <option value="360">6時間</option>
+                <option value="720">12時間</option>
+                <option value="1440">24時間</option>
+              </select>
+            </label>
+            <div class="mini-grid tight">
+              <label class="field">バケット上限
+                <input id="resultBucketMaxHours" type="number" min="1" step="1" value="24" />
+              </label>
+              <label class="field">初回対応比較ライン
+                <input id="resultResponseThresholdHours" type="number" min="0.1" step="0.5" value="3" />
+              </label>
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <p class="sidebar-block-title">有効応募年齢</p>
+            <div class="mini-grid tight">
+              <label class="field">下限
+                <input id="resultMinValidAge" type="number" min="0" step="1" value="15" />
+              </label>
+              <label class="field">上限
+                <input id="resultMaxValidAge" type="number" min="0" step="1" value="49" />
+              </label>
+            </div>
+          </div>
+
+          <div class="sidebar-block">
+            <p class="sidebar-block-title">匿名化</p>
+            <div class="toggle-list">
+              <label class="toggle-row">
+                <span>応募者名を匿名化</span>
+                <input id="resultAnonymizeApplicants" type="checkbox" checked />
+              </label>
+              <label class="toggle-row">
+                <span>更新ユーザー名を匿名化</span>
+                <input id="resultAnonymizeUsers" type="checkbox" />
+              </label>
+            </div>
+          </div>
+
+          <button id="resultApplySettingsBtn" class="success" type="button">この条件で再集計</button>
+        </div>
+      </aside>
+
+      <section class="result-main">
+        <div class="result-topbar">
+          <div>
+            <h2>集計結果</h2>
+            <p class="small-note">表・グラフ表示のための結果ページです。サイドバーの条件を変更して再集計できます。</p>
+          </div>
+          <div class="result-actions">
+            <button id="resultDownloadBtn" class="success" type="button" disabled>Excelをダウンロード</button>
+            <button id="backToInputBtn" class="secondary" type="button">CSV画面に戻る</button>
+          </div>
+        </div>
+
+        <div id="resultSummaryCards" class="summary-card-grid"></div>
+
+        <section class="result-box">
+          <h3>集計表エリア</h3>
+          <p class="small-note">次の改修で、行・列項目や集計ロジックをここに組み込みます。現段階では全体サマリーの箱を表示します。</p>
+          <div id="aggregateTableArea" class="preview" style="margin-top:12px;"></div>
+        </section>
+
+        <section class="result-box">
+          <h3>詳細データプレビュー</h3>
+          <p class="small-note">ピボット用イベントデータの先頭100行です。後続の表設計時に確認用として使えます。</p>
+          <div id="resultPreviewArea" class="preview" style="margin-top:12px;"></div>
+        </section>
+
+        <section class="result-box muted-box">
+          <h3>グラフエリア</h3>
+          <p class="small-note">グラフ表示は次段階で実装します。まずはこの枠を表示先として確保しています。</p>
+        </section>
+      </section>
+    </div>
   </main>
 
   <div id="configModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="configTitle">
@@ -842,7 +1182,8 @@
 
       result: null,
       workbook: null,
-      outputName: ''
+      outputName: '',
+      currentLog: null
     };
 
     const requiredLibs = [
@@ -911,11 +1252,33 @@
       mappingArea: document.getElementById('mappingArea'),
       settingsCard: document.getElementById('settingsCard'),
       weekdayBoxes: document.getElementById('weekdayBoxes'),
+      inputPage: document.getElementById('inputPage'),
+      resultPage: document.getElementById('resultPage'),
+      resultShell: document.getElementById('resultShell'),
+      resultSidebarToggle: document.getElementById('resultSidebarToggle'),
+      resultWeekdayBoxes: document.getElementById('resultWeekdayBoxes'),
+      resultBizStart: document.getElementById('resultBizStart'),
+      resultBizEnd: document.getElementById('resultBizEnd'),
+      resultBucketMinutes: document.getElementById('resultBucketMinutes'),
+      resultBucketMaxHours: document.getElementById('resultBucketMaxHours'),
+      resultResponseThresholdHours: document.getElementById('resultResponseThresholdHours'),
+      resultMinValidAge: document.getElementById('resultMinValidAge'),
+      resultMaxValidAge: document.getElementById('resultMaxValidAge'),
+      resultAnonymizeApplicants: document.getElementById('resultAnonymizeApplicants'),
+      resultAnonymizeUsers: document.getElementById('resultAnonymizeUsers'),
+      resultApplySettingsBtn: document.getElementById('resultApplySettingsBtn'),
+      resultDownloadBtn: document.getElementById('resultDownloadBtn'),
+      backToInputBtn: document.getElementById('backToInputBtn'),
+      resultSummaryCards: document.getElementById('resultSummaryCards'),
+      aggregateTableArea: document.getElementById('aggregateTableArea'),
+      resultPreviewArea: document.getElementById('resultPreviewArea'),
       bizStart: document.getElementById('bizStart'),
       bizEnd: document.getElementById('bizEnd'),
       bucketMinutes: document.getElementById('bucketMinutes'),
       bucketMaxHours: document.getElementById('bucketMaxHours'),
       responseThresholdHours: document.getElementById('responseThresholdHours'),
+      minValidAge: document.getElementById('minValidAge'),
+      maxValidAge: document.getElementById('maxValidAge'),
       anonymizeApplicants: document.getElementById('anonymizeApplicants'),
       anonymizeUsers: document.getElementById('anonymizeUsers'),
       useFallback: document.getElementById('useFallback'),
@@ -937,6 +1300,7 @@
 
     function init() {
       renderWeekdayBoxes();
+      renderResultWeekdayBoxes();
       bindEvents();
       setHistoryDropzoneIdle();
       setApplicantDropzoneIdle();
@@ -953,16 +1317,28 @@
 
       els.processBtn.addEventListener('click', () => {
         try {
-          processData();
+          processData({ navigate: true, download: false });
         } catch (err) {
           console.error(err);
           appendLog('エラー: ' + (err && err.message ? err.message : String(err)));
           alert('処理中にエラーが発生しました。処理ログを確認してください。');
         }
       });
-      els.downloadBtn.addEventListener('click', () => {
-        if (!state.workbook) return;
-        window.XLSX.writeFile(state.workbook, state.outputName || 'etl_result.xlsx', { compression: true });
+      els.downloadBtn.addEventListener('click', downloadWorkbook);
+      els.resultDownloadBtn.addEventListener('click', downloadWorkbook);
+      els.backToInputBtn.addEventListener('click', showInputPage);
+      els.resultSidebarToggle.addEventListener('click', () => {
+        els.resultShell.classList.toggle('sidebar-collapsed');
+      });
+      els.resultApplySettingsBtn.addEventListener('click', () => {
+        try {
+          syncResultSettingsToTop();
+          processData({ navigate: true, download: false });
+        } catch (err) {
+          console.error(err);
+          appendLog('エラー: ' + (err && err.message ? err.message : String(err)));
+          alert('再集計中にエラーが発生しました。処理ログを確認してください。');
+        }
       });
       els.resetBtn.addEventListener('click', resetAll);
       els.configBtn.addEventListener('click', openConfigModal);
@@ -987,12 +1363,20 @@
     }
 
     function renderWeekdayBoxes() {
-      els.weekdayBoxes.innerHTML = '';
+      renderWeekdayCheckboxes(els.weekdayBoxes, 'offday');
+    }
+
+    function renderResultWeekdayBoxes() {
+      renderWeekdayCheckboxes(els.resultWeekdayBoxes, 'resultOffday');
+    }
+
+    function renderWeekdayCheckboxes(container, name) {
+      container.innerHTML = '';
       weekdays.forEach(day => {
         const label = document.createElement('label');
         label.className = 'check-card';
-        label.innerHTML = `<input type="checkbox" name="offday" value="${day.value}" ${day.value === 0 || day.value === 6 ? 'checked' : ''}>${day.label}`;
-        els.weekdayBoxes.appendChild(label);
+        label.innerHTML = `<input type="checkbox" name="${name}" value="${day.value}" ${day.value === 0 || day.value === 6 ? 'checked' : ''}>${day.label}`;
+        container.appendChild(label);
       });
     }
 
@@ -1128,8 +1512,8 @@
       const parts = [];
       if (state.applicantRows.length) parts.push(`応募者情報CSV ${state.applicantRows.length}行`);
       if (state.rows.length) parts.push(`対応履歴CSV ${state.rows.length}行`);
-      if (!state.rows.length) return '対応履歴CSVを読み込むと生成できます。応募者情報CSVは任意ですが、入れると未対応応募者も含められます。';
-      return `${parts.join(' / ')}。必要に応じて条件を確認し、Excelを生成できます。`;
+      if (!state.rows.length) return '対応履歴CSVを読み込むと集計結果を表示できます。応募者情報CSVは任意ですが、入れると未対応応募者も含められます。';
+      return `${parts.join(' / ')}。必要に応じて条件を確認し、集計結果を表示できます。`;
     }
 
     function detectEncoding(bytes) {
@@ -1234,9 +1618,14 @@
       const bucketMinutes = Number(els.bucketMinutes.value || 60);
       const bucketMaxHours = Number(els.bucketMaxHours.value || 24);
       const responseThresholdHours = Number(els.responseThresholdHours.value || 3);
+      const minValidAge = Number(els.minValidAge.value || 15);
+      const maxValidAge = Number(els.maxValidAge.value || 49);
       if (!Number.isFinite(bucketMinutes) || bucketMinutes <= 0) throw new Error('時間バケット幅が不正です。');
       if (!Number.isFinite(bucketMaxHours) || bucketMaxHours <= 0) throw new Error('バケット上限が不正です。');
       if (!Number.isFinite(responseThresholdHours) || responseThresholdHours <= 0) throw new Error('初回対応比較ラインが不正です。');
+      if (!Number.isFinite(minValidAge) || !Number.isFinite(maxValidAge) || minValidAge < 0 || maxValidAge < 0 || minValidAge > maxValidAge) {
+        throw new Error('有効応募年齢の範囲が不正です。');
+      }
 
       return {
         offDays,
@@ -1245,6 +1634,8 @@
         bucketMinutes,
         bucketMaxMinutes: Math.round(bucketMaxHours * 60),
         responseThresholdMinutes: Math.round(responseThresholdHours * 60),
+        minValidAge: Math.round(minValidAge),
+        maxValidAge: Math.round(maxValidAge),
         anonymizeApplicants: els.anonymizeApplicants.checked,
         anonymizeUsers: els.anonymizeUsers.checked,
         useFallback: els.useFallback.value === 'true',
@@ -1255,7 +1646,7 @@
       };
     }
 
-    function processData() {
+    function processData(options = {}) {
       const mapping = getMapping();
       const applicantMapping = getApplicantMapping();
       const settings = getSettings();
@@ -1275,13 +1666,24 @@
       const result = applyAnonymization(rawResult, settings, log);
 
       state.result = result;
+      state.currentLog = log;
       state.workbook = createWorkbook(result, mapping, applicantMapping, settings, log);
       state.outputName = makeOutputName(state.file ? state.file.name : 'etl_result.csv');
 
       renderResult(result, log);
+      renderResultPage(result, log);
       els.resultCard.classList.remove('hidden');
       els.downloadBtn.disabled = false;
-      appendLog('Excel作成完了: ' + state.outputName);
+      els.resultDownloadBtn.disabled = false;
+      appendLog('集計完了: ' + state.outputName);
+
+      if (options.navigate) showResultPage();
+      if (options.download) downloadWorkbook();
+      return result;
+    }
+
+    function downloadWorkbook() {
+      if (!state.workbook) return;
       window.XLSX.writeFile(state.workbook, state.outputName || 'etl_result.xlsx', { compression: true });
     }
 
@@ -1304,6 +1706,7 @@
         applicantGroups: 0,
         applicantDuplicateGroups: 0,
         applicantDuplicateRows: 0,
+        ageExcludedGroups: 0,
         historyMatchedGroups: 0,
         historyUnmatchedGroups: 0,
         exactEvents: 0,
@@ -1510,6 +1913,19 @@
       applicantGroups.forEach(group => {
         const applicantRows = group.rows;
         const base = getBaseFromApplicantInfo(applicantRows, settings);
+        if (!isWithinValidAge(base.age, settings)) {
+          log.ageExcludedGroups++;
+          log.joinRows.push({
+            '応募者キー': group.key,
+            '応募者情報CSV行数': applicantRows.length,
+            '対応履歴CSV行数': (historyMap.get(group.key) || []).length,
+            '結合状態': '年齢条件で除外',
+            '結合キー一覧': uniqueList(applicantRows.map(r => r.joinKey)).join(' | '),
+            '応募者情報_最初の応募日時': formatDateTime(base.applyDate),
+            '応募者情報_最後の応募日時': base.lastApplyDate ? formatDateTime(base.lastApplyDate) : ''
+          });
+          return;
+        }
         const historyRows = (historyMap.get(group.key) || []).slice().sort(compareRowsByActionThenRow);
         if (historyRows.length) matchedHistoryKeys.add(group.key);
 
@@ -1593,7 +2009,8 @@
         workplaceAddressList: '',
         jobCategoryList: '',
         joinKeyList: first.joinKey || '',
-        sourceType: '対応履歴CSVのみ'
+        sourceType: '対応履歴CSVのみ',
+        validAgeFlag: ''
       };
     }
 
@@ -1628,7 +2045,8 @@
         workplaceAddressList: uniqueList(sorted.map(r => r.workplaceAddress)).join(' | '),
         jobCategoryList: uniqueList(sorted.map(r => r.jobCategory)).join(' | '),
         joinKeyList: uniqueList(sorted.map(r => r.joinKey)).join(' | '),
-        sourceType: '応募者情報CSV母集団'
+        sourceType: '応募者情報CSV母集団',
+        validAgeFlag: isWithinValidAge(age, settings) ? 1 : 0
       };
     }
 
@@ -1705,6 +2123,7 @@
         '代表仕事名': base.jobTitle,
         '年齢': base.age,
         '年代': base.ageGroup,
+        '有効応募年齢フラグ': base.validAgeFlag,
         '応募媒体': base.media,
         '勤務場所名': base.workplaceName,
         '勤務所在地': base.workplaceAddress,
@@ -1760,6 +2179,7 @@
         '代表仕事名': base.jobTitle,
         '年齢': base.age,
         '年代': base.ageGroup,
+        '有効応募年齢フラグ': base.validAgeFlag,
         '応募媒体': base.media,
         '勤務場所名': base.workplaceName,
         '勤務所在地': base.workplaceAddress,
@@ -1867,6 +2287,7 @@
         { '項目': '時間バケット幅', '値': durationShort(settings.bucketMinutes), '補足': '経過時間バケット列の区切り幅' },
         { '項目': 'バケット上限', '値': durationShort(settings.bucketMaxMinutes), '補足': '上限を超えた場合は「上限超」表記' },
         { '項目': '初回対応比較ライン', '値': durationShort(settings.responseThresholdMinutes), '補足': '速度別集計の「以内 / 超」判定に使用' },
+        { '項目': '有効応募年齢', '値': `${settings.minValidAge}歳～${settings.maxValidAge}歳`, '補足': '応募者情報CSVに年齢がある場合、範囲外を集計結果から除外' },
         { '項目': '応募者名匿名化', '値': settings.anonymizeApplicants ? 'ON' : 'OFF', '補足': 'ONの場合、応募者000001形式に置換' },
         { '項目': '更新ユーザー名匿名化', '値': settings.anonymizeUsers ? 'ON' : 'OFF', '補足': 'ONの場合、ユーザー000001形式に置換' },
         { '項目': '旧データfallback判定', '値': settings.useFallback ? '使う' : '使わない', '補足': '対応内容にステータス遷移が無い場合、対応ステータス名から推定' },
@@ -2033,6 +2454,117 @@
       return `${((numerator / denominator) * 100).toFixed(1)}%`;
     }
 
+
+    function showResultPage() {
+      syncTopSettingsToResultSidebar();
+      els.inputPage.classList.add('hidden');
+      els.resultPage.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showInputPage() {
+      els.resultPage.classList.add('hidden');
+      els.inputPage.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function syncTopSettingsToResultSidebar() {
+      copyWeekdaySelection('offday', 'resultOffday');
+      els.resultBizStart.value = els.bizStart.value;
+      els.resultBizEnd.value = els.bizEnd.value;
+      els.resultBucketMinutes.value = els.bucketMinutes.value;
+      els.resultBucketMaxHours.value = els.bucketMaxHours.value;
+      els.resultResponseThresholdHours.value = els.responseThresholdHours.value;
+      els.resultMinValidAge.value = els.minValidAge.value;
+      els.resultMaxValidAge.value = els.maxValidAge.value;
+      els.resultAnonymizeApplicants.checked = els.anonymizeApplicants.checked;
+      els.resultAnonymizeUsers.checked = els.anonymizeUsers.checked;
+    }
+
+    function syncResultSettingsToTop() {
+      copyWeekdaySelection('resultOffday', 'offday');
+      els.bizStart.value = els.resultBizStart.value;
+      els.bizEnd.value = els.resultBizEnd.value;
+      els.bucketMinutes.value = els.resultBucketMinutes.value;
+      els.bucketMaxHours.value = els.resultBucketMaxHours.value;
+      els.responseThresholdHours.value = els.resultResponseThresholdHours.value;
+      els.minValidAge.value = els.resultMinValidAge.value;
+      els.maxValidAge.value = els.resultMaxValidAge.value;
+      els.anonymizeApplicants.checked = els.resultAnonymizeApplicants.checked;
+      els.anonymizeUsers.checked = els.resultAnonymizeUsers.checked;
+    }
+
+    function copyWeekdaySelection(fromName, toName) {
+      const selected = new Set(Array.from(document.querySelectorAll(`input[name="${fromName}"]:checked`)).map(el => String(el.value)));
+      document.querySelectorAll(`input[name="${toName}"]`).forEach(el => {
+        el.checked = selected.has(String(el.value));
+      });
+    }
+
+    function renderResultPage(result, log) {
+      renderResultSummaryCards(result, log);
+      renderAggregateTable(result, log);
+      renderResultPreview(result.events.slice(0, 100));
+    }
+
+    function renderResultSummaryCards(result, log) {
+      const summaries = result.summaries || [];
+      const events = result.events || [];
+      const counts = countBy(events, 'イベント種別');
+      const appCount = summaries.length || counts['応募'] || 0;
+      const firstActions = counts['初回アクション'] || 0;
+      const interviews = counts['面接以上到達'] || 0;
+      const offers = counts['内定以上到達'] || 0;
+      const hires = counts['採用以上到達'] || 0;
+      const cards = [
+        { label: '応募数', value: appCount, sub: '有効応募年齢条件適用後' },
+        { label: '初回アクション', value: firstActions, sub: rateText(firstActions, appCount) },
+        { label: '面接以上', value: interviews, sub: rateText(interviews, appCount) },
+        { label: '内定以上', value: offers, sub: rateText(offers, appCount) },
+        { label: '採用以上', value: hires, sub: rateText(hires, appCount) }
+      ];
+      els.resultSummaryCards.innerHTML = cards.map(card => `
+        <div class="summary-card">
+          <div class="label">${escapeHtml(card.label)}</div>
+          <div class="value">${escapeHtml(card.value)}</div>
+          <div class="sub">${escapeHtml(card.sub)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderAggregateTable(result, log) {
+      const summaries = result.summaries || [];
+      const events = result.events || [];
+      const counts = countBy(events, 'イベント種別');
+      const appCount = summaries.length || counts['応募'] || 0;
+      const rows = [
+        { '指標': '応募数', '件数': appCount, '率': '100.0%', '補足': '有効応募年齢条件適用後' },
+        { '指標': '初回アクション数', '件数': counts['初回アクション'] || 0, '率': rateText(counts['初回アクション'] || 0, appCount), '補足': '未対応から別ステータスへの初回変更' },
+        { '指標': '面接以上数', '件数': counts['面接以上到達'] || 0, '率': rateText(counts['面接以上到達'] || 0, appCount), '補足': '面接確定 / 内定 / 採用 / 入社' },
+        { '指標': '内定以上数', '件数': counts['内定以上到達'] || 0, '率': rateText(counts['内定以上到達'] || 0, appCount), '補足': '内定 / 採用 / 入社' },
+        { '指標': '採用以上数', '件数': counts['採用以上到達'] || 0, '率': rateText(counts['採用以上到達'] || 0, appCount), '補足': '採用 / 入社' },
+        { '指標': '年齢条件除外', '件数': log.ageExcludedGroups || 0, '率': '', '補足': '応募者情報CSV使用時のみ' }
+      ];
+      els.aggregateTableArea.innerHTML = rowsToTableHtml(rows);
+    }
+
+    function renderResultPreview(rows) {
+      if (!rows.length) {
+        els.resultPreviewArea.innerHTML = '<div style="padding:14px;">プレビュー対象データがありません。</div>';
+        return;
+      }
+      els.resultPreviewArea.innerHTML = rowsToTableHtml(rows);
+    }
+
+    function rowsToTableHtml(rows) {
+      if (!rows.length) return '<div style="padding:14px;">該当データがありません。</div>';
+      const headers = Object.keys(rows[0]);
+      let html = '<table><thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
+      html += rows.map(row => '<tr>' + headers.map(h => `<td>${escapeHtml(row[h])}</td>`).join('') + '</tr>').join('');
+      html += '</tbody></table>';
+      return html;
+    }
+
     function renderResult(result, log) {
       const counts = countBy(result.events, 'イベント種別');
       els.summaryPills.innerHTML = '';
@@ -2095,6 +2627,7 @@
       state.result = null;
       state.workbook = null;
       state.outputName = '';
+      state.currentLog = null;
       els.fileInput.value = '';
       els.applicantFileInput.value = '';
       els.fileMeta.textContent = '未読み込み';
@@ -2104,13 +2637,18 @@
       els.resultCard.classList.add('hidden');
       els.processBtn.disabled = true;
       els.downloadBtn.disabled = true;
+      els.resultDownloadBtn.disabled = true;
       els.mappingArea.innerHTML = '';
       els.applicantMappingArea.innerHTML = '';
       els.previewArea.innerHTML = '';
       els.summaryPills.innerHTML = '';
+      els.resultSummaryCards.innerHTML = '';
+      els.aggregateTableArea.innerHTML = '';
+      els.resultPreviewArea.innerHTML = '';
       els.logArea.textContent = '';
       els.logCard.classList.add('hidden');
-      els.quickStatus.textContent = '対応履歴CSVを読み込むと生成できます。応募者情報CSVは任意です。';
+      els.quickStatus.textContent = '対応履歴CSVを読み込むと集計結果を表示できます。応募者情報CSVは任意です。';
+      showInputPage();
       setHistoryDropzoneIdle();
       setApplicantDropzoneIdle();
       closeConfigModal();
@@ -2120,10 +2658,15 @@
       state.result = null;
       state.workbook = null;
       state.outputName = '';
+      state.currentLog = null;
       els.resultCard.classList.add('hidden');
       els.downloadBtn.disabled = true;
+      els.resultDownloadBtn.disabled = true;
       els.previewArea.innerHTML = '';
       els.summaryPills.innerHTML = '';
+      els.resultSummaryCards.innerHTML = '';
+      els.aggregateTableArea.innerHTML = '';
+      els.resultPreviewArea.innerHTML = '';
     }
 
     function parseTransition(content) {
@@ -2148,6 +2691,13 @@
       const memoWords = ['備考を', 'メモを', 'コメントを', '社内メモ', '応募詳細'];
       const actionWords = ['メール', 'TEL', '電話', '面接', '内定', '採用', '入社', '不採用', '辞退', '連絡'];
       return memoWords.some(w => s.includes(w)) && !actionWords.some(w => s.includes(w));
+    }
+
+
+    function isWithinValidAge(age, settings) {
+      if (age === '' || age === null || age === undefined || isNaN(Number(age))) return true;
+      const n = Number(age);
+      return n >= settings.minValidAge && n <= settings.maxValidAge;
     }
 
     function businessMinutesBetween(start, end, settings) {
