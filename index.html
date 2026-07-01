@@ -752,7 +752,7 @@
 
     .custom-tooltip {
       position: fixed;
-      z-index: 9999;
+      z-index: 99999;
       left: 0;
       top: 0;
       transform: translate(0, -50%);
@@ -1537,7 +1537,7 @@
       previewArea: document.getElementById('previewArea'),
       logCard: document.getElementById('logCard'),
       logArea: document.getElementById('logArea'),
-      customTooltip: document.getElementById('customTooltip')
+      customTooltip: null
     };
 
     init();
@@ -1545,6 +1545,7 @@
     function init() {
       renderWeekdayBoxes();
       renderResultWeekdayBoxes();
+      ensureCustomTooltip();
       bindEvents();
       setHistoryDropzoneIdle();
       setApplicantDropzoneIdle();
@@ -2702,6 +2703,18 @@
     }
 
 
+    function ensureCustomTooltip() {
+      let tooltip = document.getElementById('customTooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'customTooltip';
+        tooltip.className = 'custom-tooltip';
+        tooltip.setAttribute('role', 'tooltip');
+        document.body.appendChild(tooltip);
+      }
+      els.customTooltip = tooltip;
+    }
+
     function bindCustomTooltip(el) {
       el.addEventListener('mouseenter', () => showCustomTooltip(el));
       el.addEventListener('mousemove', () => positionCustomTooltip(el));
@@ -2712,14 +2725,16 @@
 
     function showCustomTooltip(el) {
       const label = el.dataset.tooltip || el.getAttribute('aria-label') || '';
-      if (!label || !els.customTooltip) return;
+      if (!label) return;
+      ensureCustomTooltip();
       els.customTooltip.textContent = label;
       positionCustomTooltip(el);
       els.customTooltip.classList.add('is-visible');
     }
 
     function positionCustomTooltip(el) {
-      if (!els.customTooltip || !els.customTooltip.classList.contains('is-visible')) return;
+      ensureCustomTooltip();
+      if (!els.customTooltip.classList.contains('is-visible')) return;
       const rect = el.getBoundingClientRect();
       const gap = 10;
       let left = rect.right + gap;
@@ -3292,6 +3307,5 @@
         .replace(/'/g, '&#039;');
     }
   </script>
-  <div id="customTooltip" class="custom-tooltip" role="tooltip"></div>
 </body>
 </html>
