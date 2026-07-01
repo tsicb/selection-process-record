@@ -930,7 +930,12 @@
     }
 
     .result-topbar {
-      background: rgba(255,255,255,.88);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(219, 227, 239, .92);
       border-radius: 18px;
       box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
