@@ -737,7 +737,8 @@
       color: #e5edf8;
       box-shadow: none;
       border: 1px solid rgba(148, 163, 184, .20);
-      font-size: 17px;
+      font-size: 22px;
+      font-weight: 800;
       line-height: 1;
     }
 
@@ -761,8 +762,9 @@
       line-height: 1;
       opacity: 0;
       pointer-events: none;
-      transition: opacity .14s ease;
-      z-index: 20;
+      transition: opacity .08s ease;
+      transition-delay: 0s;
+      z-index: 60;
       box-shadow: 0 10px 22px rgba(15, 23, 42, .18);
     }
 
@@ -803,6 +805,7 @@
       background: linear-gradient(135deg, #2563eb, #0f766e);
       border-color: rgba(255, 255, 255, .20);
       box-shadow: 0 10px 22px rgba(37, 99, 235, .25);
+      font-size: 18px;
     }
 
     .result-shell.sidebar-collapsed .sidebar-toggle:hover {
@@ -1222,7 +1225,7 @@
               <span>条件設定</span>
             </div>
           </div>
-          <button id="resultSidebarToggle" class="sidebar-toggle" type="button" title="サイドバーを閉じる" aria-label="サイドバーを閉じる" data-tooltip="サイドバーを閉じる">◧</button>
+          <button id="resultSidebarToggle" class="sidebar-toggle" type="button" aria-label="サイドバーを閉じる" data-tooltip="サイドバーを閉じる">×</button>
         </div>
         <div class="result-sidebar-content">
           <div class="sidebar-block">
@@ -2697,10 +2700,9 @@
     function updateSidebarToggleState() {
       const collapsed = els.resultShell.classList.contains('sidebar-collapsed');
       const label = collapsed ? 'サイドバーを開く' : 'サイドバーを閉じる';
-      els.resultSidebarToggle.title = label;
       els.resultSidebarToggle.setAttribute('aria-label', label);
       els.resultSidebarToggle.dataset.tooltip = label;
-      els.resultSidebarToggle.textContent = collapsed ? '☰' : '◧';
+      els.resultSidebarToggle.textContent = collapsed ? '☰' : '×';
     }
 
     function showResultPage() {
