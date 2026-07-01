@@ -1010,6 +1010,85 @@
       max-height: min(58vh, 620px);
     }
 
+    .aggregate-table-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .aggregate-table-section {
+      min-width: 0;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(219, 227, 239, .92);
+      border-radius: 18px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .05);
+      padding: 14px;
+    }
+
+    .aggregate-table-section h3 {
+      margin: 0 0 5px;
+      font-size: 17px;
+    }
+
+    .aggregate-table-section .preview {
+      max-height: none;
+      overflow-x: auto;
+      overflow-y: visible;
+      margin-top: 10px;
+    }
+
+    .aggregate-table {
+      min-width: 1480px;
+      width: max-content;
+      font-size: 12px;
+    }
+
+    .aggregate-table th,
+    .aggregate-table td {
+      padding: 8px 9px;
+      vertical-align: middle;
+    }
+
+    .aggregate-table th:first-child,
+    .aggregate-table td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #ffffff;
+      min-width: 190px;
+      max-width: 320px;
+      white-space: normal;
+    }
+
+    .aggregate-table th:first-child {
+      z-index: 4;
+      background: #f8fafc;
+    }
+
+    .aggregate-table .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .aggregate-table .total-row td {
+      font-weight: 800;
+      background: #f8fafc;
+      border-top: 2px solid var(--line);
+    }
+
+    .aggregate-table .total-row td:first-child {
+      background: #f8fafc;
+    }
+
+    .aggregate-table .special-row td {
+      background: #f0fdfa;
+      font-weight: 700;
+    }
+
+    .aggregate-table .special-row td:first-child {
+      background: #f0fdfa;
+    }
+
     .muted-box {
       background: rgba(248,250,252,.82);
       border-style: dashed;
@@ -1314,22 +1393,8 @@
 
         <div id="resultSummaryCards" class="summary-card-grid"></div>
 
-        <section class="result-box">
-          <h3>集計表エリア</h3>
-          <p class="small-note">次の改修で、行・列項目や集計ロジックをここに組み込みます。現段階では全体サマリーの箱を表示します。</p>
-          <div id="aggregateTableArea" class="preview" style="margin-top:12px;"></div>
-        </section>
-
-        <section class="result-box">
-          <h3>詳細データプレビュー</h3>
-          <p class="small-note">ピボット用イベントデータの先頭100行です。後続の表設計時に確認用として使えます。</p>
-          <div id="resultPreviewArea" class="preview" style="margin-top:12px;"></div>
-        </section>
-
-        <section class="result-box muted-box">
-          <h3>グラフエリア</h3>
-          <p class="small-note">グラフ表示は次段階で実装します。まずはこの枠を表示先として確保しています。</p>
-        </section>
+        <div id="aggregateTableArea" class="aggregate-table-stack"></div>
+        <div id="resultPreviewArea" class="hidden"></div>
       </section>
     </div>
   </main>
@@ -2813,7 +2878,6 @@
     function renderResultPage(result, log) {
       renderResultSummaryCards(result, log);
       renderAggregateTable(result, log);
-      renderResultPreview(result.events.slice(0, 100));
     }
 
     function renderResultSummaryCards(result, log) {
@@ -2843,21 +2907,304 @@
 
     function renderAggregateTable(result, log) {
       const summaries = result.summaries || [];
-      const events = result.events || [];
-      const counts = countBy(events, 'イベント種別');
-      const appCount = summaries.length || counts['応募'] || 0;
-      const rows = [
-        { '指標': '応募数', '件数': appCount, '率': '100.0%', '補足': '有効応募年齢条件適用後' },
-        { '指標': '初回アクション数', '件数': counts['初回アクション'] || 0, '率': rateText(counts['初回アクション'] || 0, appCount), '補足': '未対応から別ステータスへの初回変更' },
-        { '指標': '面接以上数', '件数': counts['面接以上到達'] || 0, '率': rateText(counts['面接以上到達'] || 0, appCount), '補足': '面接確定 / 内定 / 採用 / 入社' },
-        { '指標': '内定以上数', '件数': counts['内定以上到達'] || 0, '率': rateText(counts['内定以上到達'] || 0, appCount), '補足': '内定 / 採用 / 入社' },
-        { '指標': '採用以上数', '件数': counts['採用以上到達'] || 0, '率': rateText(counts['採用以上到達'] || 0, appCount), '補足': '採用 / 入社' },
-        { '指標': '年齢条件除外', '件数': log.ageExcludedGroups || 0, '率': '', '補足': '応募者情報CSV使用時のみ' }
+      const settings = getSettings();
+      const tables = buildAggregateTables(summaries, settings);
+      els.aggregateTableArea.innerHTML = tables.map(table => renderAggregateTableSection(table)).join('');
+    }
+
+    function buildAggregateTables(summaries, settings) {
+      return [
+        {
+          title: '応募月別',
+          note: '応募月ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => row['応募月'] || '未設定', { sort: sortByLabelAsc })
+        },
+        {
+          title: '媒体別',
+          note: '応募媒体ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['応募媒体']), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '年代別',
+          note: '年代ごとの数値集計です。有効応募年齢の集計行を追加し、最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['年代']), {
+            sort: sortAgeGroupRows,
+            specialRows: [
+              {
+                label: `有効応募年齢（${settings.minValidAge}歳～${settings.maxValidAge}歳）`,
+                rows: summaries.filter(row => isAgeWithinRange(row['年齢'], settings)),
+                className: 'special-row'
+              }
+            ]
+          })
+        },
+        {
+          title: '初回対応経過時間別',
+          note: '初回対応経過時間バケットごとの数値集計です。比較ライン以内/超の集計行を追加し、最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => row['初回アクション時間バケット_全時間'] || '未対応', {
+            sort: sortDurationBucketRows,
+            specialRows: [
+              {
+                label: `初回対応 ${durationShort(settings.responseThresholdMinutes)}以内`,
+                rows: summaries.filter(row => Number(row['初回対応比較ライン以内フラグ_全時間']) === 1),
+                className: 'special-row'
+              },
+              {
+                label: `初回対応 ${durationShort(settings.responseThresholdMinutes)}超`,
+                rows: summaries.filter(row => row['初回アクション有無'] && Number(row['初回対応比較ライン以内フラグ_全時間']) === 0),
+                className: 'special-row'
+              }
+            ]
+          })
+        },
+        {
+          title: '勤務場所別',
+          note: '勤務地名称ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['勤務場所名']), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '都道府県別',
+          note: '求人都道府県ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['勤務所在地_都道府県']), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '対応ユーザー別',
+          note: '初回対応を行った更新ユーザーごとの数値集計です。未対応は「未対応/ユーザーなし」に入ります。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['初回アクション更新ユーザー名'], '未対応/ユーザーなし'), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '職種分類別',
+          note: '職種分類ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['職種分類']), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '応募曜日別',
+          note: '応募曜日ごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['応募曜日']), { sort: sortWeekdayRows })
+        },
+        {
+          title: 'タイトル別',
+          note: '求人タイトルごとの数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => cleanGroupLabel(row['代表仕事名']), { sort: sortByApplicationsDesc })
+        },
+        {
+          title: '営業時間内応募vs時間外応募',
+          note: '応募日時が営業時間内だった応募者と、それ以外の応募者の数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => Number(row['応募日_営業時間内フラグ']) === 1 ? '営業時間内応募' : '営業時間外応募', { sort: sortBusinessTimeRows })
+        },
+        {
+          title: '面接/到達vs非到達',
+          note: '面接ステータス以降に到達した応募者と到達しなかった応募者の数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => Number(row['面接以上有無']) === 1 ? '面接到達' : '面接非到達', { sort: sortInterviewRows })
+        },
+        {
+          title: '内定/到達vs非到達',
+          note: '内定ステータス以降に到達した応募者と到達しなかった応募者の数値集計です。最下行は総計です。',
+          rows: buildGroupedAggregateRows(summaries, row => Number(row['内定以上有無']) === 1 ? '内定到達' : '内定非到達', { sort: sortOfferRows })
+        }
       ];
-      els.aggregateTableArea.innerHTML = rowsToTableHtml(rows);
+    }
+
+    function buildGroupedAggregateRows(rows, groupGetter, options = {}) {
+      const map = new Map();
+      rows.forEach(row => {
+        const label = cleanGroupLabel(groupGetter(row));
+        if (!map.has(label)) map.set(label, []);
+        map.get(label).push(row);
+      });
+
+      let output = Array.from(map.entries()).map(([label, groupRows]) => aggregateMetricRow(label, groupRows, rows));
+      if (options.sort) output.sort(options.sort);
+
+      if (options.specialRows && options.specialRows.length) {
+        options.specialRows.forEach(special => {
+          const metric = aggregateMetricRow(special.label, special.rows || [], rows);
+          metric.__className = special.className || 'special-row';
+          output.push(metric);
+        });
+      }
+
+      const total = aggregateMetricRow('総計', rows, rows);
+      total.__className = 'total-row';
+      output.push(total);
+      return output;
+    }
+
+    function aggregateMetricRow(label, groupRows, allRows) {
+      const applications = groupRows.length;
+      const firstActions = sumFlag(groupRows, '初回アクション有無');
+      const interviews = sumFlag(groupRows, '面接以上有無');
+      const offers = sumFlag(groupRows, '内定以上有無');
+
+      const totalApplications = allRows.length;
+      const totalInterviews = sumFlag(allRows, '面接以上有無');
+      const totalOffers = sumFlag(allRows, '内定以上有無');
+
+      return {
+        '指標': label || '未設定',
+        '応募数': applications,
+        '初回対応数': firstActions,
+        '初回対応率': rateText(firstActions, applications),
+        '応募～初回対応経過時間（平均）': averageMinutesText(groupRows, '初回アクション経過分_全時間'),
+        '応募～初回対応経過時間（営業時間内平均）': averageMinutesText(groupRows, '初回アクション経過分_営業時間内'),
+        '面接数': interviews,
+        '面接率': rateText(interviews, applications),
+        '応募～面接経過時間（平均）': averageMinutesText(groupRows, '面接以上経過分_全時間'),
+        '内定数': offers,
+        '内定率': rateText(offers, applications),
+        '応募～内定経過時間（平均）': averageMinutesText(groupRows, '内定以上経過分_全時間'),
+        '応募数割合': rateText(applications, totalApplications),
+        '面接数割合': rateText(interviews, totalInterviews),
+        '内定数割合': rateText(offers, totalOffers)
+      };
+    }
+
+    function renderAggregateTableSection(table) {
+      return `
+        <section class="aggregate-table-section">
+          <h3>${escapeHtml(table.title)}</h3>
+          <p class="small-note">${escapeHtml(table.note || '')}</p>
+          <div class="preview">
+            ${aggregateRowsToTableHtml(table.rows)}
+          </div>
+        </section>
+      `;
+    }
+
+    function aggregateRowsToTableHtml(rows) {
+      if (!rows.length) return '<div style="padding:14px;">該当データがありません。</div>';
+      const headers = [
+        '指標',
+        '応募数',
+        '初回対応数',
+        '初回対応率',
+        '応募～初回対応経過時間（平均）',
+        '応募～初回対応経過時間（営業時間内平均）',
+        '面接数',
+        '面接率',
+        '応募～面接経過時間（平均）',
+        '内定数',
+        '内定率',
+        '応募～内定経過時間（平均）',
+        '応募数割合',
+        '面接数割合',
+        '内定数割合'
+      ];
+
+      let html = '<table class="aggregate-table"><thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
+      html += rows.map(row => {
+        const className = row.__className ? ` class="${row.__className}"` : '';
+        return `<tr${className}>` + headers.map((h, idx) => {
+          const cls = idx === 0 ? '' : ' class="num"';
+          return `<td${cls}>${escapeHtml(row[h] ?? '')}</td>`;
+        }).join('') + '</tr>';
+      }).join('');
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function averageMinutesText(rows, key) {
+      const nums = rows
+        .map(row => Number(row[key]))
+        .filter(v => Number.isFinite(v) && v >= 0);
+      if (!nums.length) return '';
+      const avg = nums.reduce((sum, v) => sum + v, 0) / nums.length;
+      return minutesToDisplay(Math.round(avg));
+    }
+
+    function sumFlag(rows, key) {
+      return rows.reduce((sum, row) => sum + Number(row[key] || 0), 0);
+    }
+
+    function cleanGroupLabel(value, fallback = '未設定') {
+      const s = String(value ?? '').trim();
+      return s || fallback;
+    }
+
+    function isAgeWithinRange(age, settings) {
+      if (age === '' || age === null || age === undefined || isNaN(Number(age))) return false;
+      const n = Number(age);
+      return n >= settings.minValidAge && n <= settings.maxValidAge;
+    }
+
+    function sortByLabelAsc(a, b) {
+      return String(a['指標']).localeCompare(String(b['指標']), 'ja');
+    }
+
+    function sortByApplicationsDesc(a, b) {
+      const diff = Number(b['応募数'] || 0) - Number(a['応募数'] || 0);
+      if (diff !== 0) return diff;
+      return sortByLabelAsc(a, b);
+    }
+
+    function sortAgeGroupRows(a, b) {
+      return ageGroupSortValue(a['指標']) - ageGroupSortValue(b['指標']);
+    }
+
+    function ageGroupSortValue(label) {
+      const s = String(label || '');
+      if (s.includes('10代')) return 10;
+      if (s.includes('20代')) return 20;
+      if (s.includes('30代')) return 30;
+      if (s.includes('40代')) return 40;
+      if (s.includes('50代')) return 50;
+      if (s.includes('60代')) return 60;
+      if (s.includes('70代')) return 70;
+      if (s.includes('80代')) return 80;
+      if (s.includes('未設定')) return 999;
+      const m = s.match(/\d+/);
+      return m ? Number(m[0]) : 998;
+    }
+
+    function sortDurationBucketRows(a, b) {
+      return durationBucketSortValue(a['指標']) - durationBucketSortValue(b['指標']);
+    }
+
+    function durationBucketSortValue(label) {
+      const s = String(label || '');
+      if (s.includes('未対応')) return 9999998;
+      if (s.includes('負の経過時間')) return 9999999;
+      const m = s.match(/^(.+?)～/);
+      if (m) return durationLabelToMinutes(m[1]);
+      const over = s.match(/^(.+?)超/);
+      if (over) return durationLabelToMinutes(over[1]) + 0.5;
+      return 9999997;
+    }
+
+    function durationLabelToMinutes(label) {
+      const s = String(label || '');
+      let total = 0;
+      const d = s.match(/(\d+)日/);
+      const h = s.match(/(\d+)時間/);
+      const m = s.match(/(\d+)分/);
+      if (d) total += Number(d[1]) * 1440;
+      if (h) total += Number(h[1]) * 60;
+      if (m) total += Number(m[1]);
+      return total;
+    }
+
+    function sortWeekdayRows(a, b) {
+      const order = { '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6, '日': 7, '未設定': 99 };
+      return (order[a['指標']] || 98) - (order[b['指標']] || 98);
+    }
+
+    function sortBusinessTimeRows(a, b) {
+      const order = { '営業時間内応募': 1, '営業時間外応募': 2 };
+      return (order[a['指標']] || 99) - (order[b['指標']] || 99);
+    }
+
+    function sortInterviewRows(a, b) {
+      const order = { '面接到達': 1, '面接非到達': 2 };
+      return (order[a['指標']] || 99) - (order[b['指標']] || 99);
+    }
+
+    function sortOfferRows(a, b) {
+      const order = { '内定到達': 1, '内定非到達': 2 };
+      return (order[a['指標']] || 99) - (order[b['指標']] || 99);
     }
 
     function renderResultPreview(rows) {
+      if (!els.resultPreviewArea) return;
       if (!rows.length) {
         els.resultPreviewArea.innerHTML = '<div style="padding:14px;">プレビュー対象データがありません。</div>';
         return;
@@ -2953,7 +3300,7 @@
       els.summaryPills.innerHTML = '';
       els.resultSummaryCards.innerHTML = '';
       els.aggregateTableArea.innerHTML = '';
-      els.resultPreviewArea.innerHTML = '';
+      if (els.resultPreviewArea) els.resultPreviewArea.innerHTML = '';
       els.logArea.textContent = '';
       els.logCard.classList.add('hidden');
       els.quickStatus.textContent = '対応履歴CSVを読み込むと集計結果を表示できます。応募者情報CSVは任意です。';
@@ -2975,7 +3322,7 @@
       els.summaryPills.innerHTML = '';
       els.resultSummaryCards.innerHTML = '';
       els.aggregateTableArea.innerHTML = '';
-      els.resultPreviewArea.innerHTML = '';
+      if (els.resultPreviewArea) els.resultPreviewArea.innerHTML = '';
     }
 
     function parseTransition(content) {
