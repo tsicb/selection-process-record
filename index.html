@@ -3111,7 +3111,9 @@
 
     function averageMinutesText(rows, key) {
       const nums = rows
-        .map(row => Number(row[key]))
+        .map(row => row[key])
+        .filter(value => value !== '' && value !== null && value !== undefined)
+        .map(value => Number(value))
         .filter(v => Number.isFinite(v) && v >= 0);
       if (!nums.length) return '';
       const avg = nums.reduce((sum, v) => sum + v, 0) / nums.length;
