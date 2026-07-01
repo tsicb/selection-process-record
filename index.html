@@ -747,28 +747,30 @@
     }
 
     .sidebar-toggle::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: calc(100% + 10px);
-      top: 50%;
-      transform: translateY(-50%);
+      display: none;
+    }
+
+    .custom-tooltip {
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      transform: translate(0, -50%);
       white-space: nowrap;
       border-radius: 8px;
-      padding: 6px 9px;
-      background: rgba(15, 23, 42, .94);
+      padding: 7px 10px;
+      background: rgba(15, 23, 42, .96);
       color: #ffffff;
       font-size: 12px;
       font-weight: 700;
       line-height: 1;
       opacity: 0;
       pointer-events: none;
-      transition: opacity .08s ease;
-      transition-delay: 0s;
-      z-index: 60;
-      box-shadow: 0 10px 22px rgba(15, 23, 42, .18);
+      transition: none;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .22);
     }
 
-    .sidebar-toggle:hover::after {
+    .custom-tooltip.is-visible {
       opacity: 1;
     }
 
@@ -1534,7 +1536,8 @@
       downloadBtn: document.getElementById('downloadBtn'),
       previewArea: document.getElementById('previewArea'),
       logCard: document.getElementById('logCard'),
-      logArea: document.getElementById('logArea')
+      logArea: document.getElementById('logArea'),
+      customTooltip: document.getElementById('customTooltip')
     };
 
     init();
@@ -1571,7 +1574,9 @@
       els.resultSidebarToggle.addEventListener('click', () => {
         els.resultShell.classList.toggle('sidebar-collapsed');
         updateSidebarToggleState();
+        positionCustomTooltip(els.resultSidebarToggle);
       });
+      bindCustomTooltip(els.resultSidebarToggle);
       els.resultApplySettingsBtn.addEventListener('click', () => {
         try {
           syncResultSettingsToTop();
@@ -2697,6 +2702,44 @@
     }
 
 
+    function bindCustomTooltip(el) {
+      el.addEventListener('mouseenter', () => showCustomTooltip(el));
+      el.addEventListener('mousemove', () => positionCustomTooltip(el));
+      el.addEventListener('mouseleave', hideCustomTooltip);
+      el.addEventListener('focus', () => showCustomTooltip(el));
+      el.addEventListener('blur', hideCustomTooltip);
+    }
+
+    function showCustomTooltip(el) {
+      const label = el.dataset.tooltip || el.getAttribute('aria-label') || '';
+      if (!label || !els.customTooltip) return;
+      els.customTooltip.textContent = label;
+      positionCustomTooltip(el);
+      els.customTooltip.classList.add('is-visible');
+    }
+
+    function positionCustomTooltip(el) {
+      if (!els.customTooltip || !els.customTooltip.classList.contains('is-visible')) return;
+      const rect = el.getBoundingClientRect();
+      const gap = 10;
+      let left = rect.right + gap;
+      let top = rect.top + rect.height / 2;
+
+      // 右端にはみ出す場合は左側へ出す
+      const tooltipWidth = els.customTooltip.offsetWidth || 0;
+      if (left + tooltipWidth + gap > window.innerWidth) {
+        left = Math.max(gap, rect.left - tooltipWidth - gap);
+      }
+
+      els.customTooltip.style.left = `${left}px`;
+      els.customTooltip.style.top = `${top}px`;
+    }
+
+    function hideCustomTooltip() {
+      if (!els.customTooltip) return;
+      els.customTooltip.classList.remove('is-visible');
+    }
+
     function updateSidebarToggleState() {
       const collapsed = els.resultShell.classList.contains('sidebar-collapsed');
       const label = collapsed ? 'サイドバーを開く' : 'サイドバーを閉じる';
@@ -3249,5 +3292,6 @@
         .replace(/'/g, '&#039;');
     }
   </script>
+  <div id="customTooltip" class="custom-tooltip" role="tooltip"></div>
 </body>
 </html>
