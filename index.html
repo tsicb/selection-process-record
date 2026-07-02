@@ -3049,19 +3049,19 @@
       return {
         '指標': label || '未設定',
         '応募数': applications,
-        '初回対応数': firstActions,
-        '初回対応率': rateText(firstActions, applications),
-        '応募～初回対応経過時間（平均）': averageMinutesText(groupRows, '初回アクション経過分_全時間'),
-        '応募～初回対応経過時間（営業時間内平均）': averageMinutesText(groupRows, '初回アクション経過分_営業時間内'),
+        '対応数': firstActions,
+        '対応率': rateText(firstActions, applications),
+        '初回対応まで': averageMinutesText(groupRows, '初回アクション経過分_全時間'),
+        '初回対応まで(営業時間内)': averageMinutesText(groupRows, '初回アクション経過分_営業時間内'),
         '面接数': interviews,
         '面接率': rateText(interviews, applications),
-        '応募～面接経過時間（平均）': averageMinutesText(groupRows, '面接以上経過分_全時間'),
+        '面接まで': averageMinutesText(groupRows, '面接以上経過分_全時間'),
         '内定数': offers,
         '内定率': rateText(offers, applications),
-        '応募～内定経過時間（平均）': averageMinutesText(groupRows, '内定以上経過分_全時間'),
-        '応募数割合': rateText(applications, totalApplications),
-        '面接数割合': rateText(interviews, totalInterviews),
-        '内定数割合': rateText(offers, totalOffers)
+        '内定まで': averageMinutesText(groupRows, '内定以上経過分_全時間'),
+        '応募構成比': rateText(applications, totalApplications),
+        '面接構成比': rateText(interviews, totalInterviews),
+        '内定構成比': rateText(offers, totalOffers)
       };
     }
 
@@ -3069,7 +3069,7 @@
       return `
         <section class="aggregate-table-section">
           <h3>${escapeHtml(table.title)}</h3>
-          <p class="small-note">${escapeHtml(table.note || '')}</p>
+          <p class="small-note">${escapeHtml(table.note || '')} 率・経過時間はいずれも応募を起点に集計しています。経過時間は各項目に到達した応募者のみの平均です。</p>
           <div class="preview">
             ${aggregateRowsToTableHtml(table.rows)}
           </div>
@@ -3082,19 +3082,19 @@
       const headers = [
         '指標',
         '応募数',
-        '初回対応数',
-        '初回対応率',
-        '応募～初回対応経過時間（平均）',
-        '応募～初回対応経過時間（営業時間内平均）',
+        '対応数',
+        '対応率',
+        '初回対応まで',
+        '初回対応まで(営業時間内)',
         '面接数',
         '面接率',
-        '応募～面接経過時間（平均）',
+        '面接まで',
         '内定数',
         '内定率',
-        '応募～内定経過時間（平均）',
-        '応募数割合',
-        '面接数割合',
-        '内定数割合'
+        '内定まで',
+        '応募構成比',
+        '面接構成比',
+        '内定構成比'
       ];
 
       let html = '<table class="aggregate-table"><thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
