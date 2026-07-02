@@ -1074,6 +1074,7 @@
     .aggregate-table .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
     }
 
     .aggregate-table .total-row td {
@@ -3603,14 +3604,15 @@
     function minutesToDisplay(minutes) {
       if (minutes === '' || minutes === null || minutes === undefined || isNaN(Number(minutes))) return '';
       const sign = Number(minutes) < 0 ? '-' : '';
-      let n = Math.abs(Number(minutes));
+      let n = Math.abs(Math.round(Number(minutes)));
       const days = Math.floor(n / 1440);
       n -= days * 1440;
       const hours = Math.floor(n / 60);
       const mins = n - hours * 60;
-      if (days > 0) return `${sign}${days}日${hours}時間${mins}分`;
-      if (hours > 0) return `${sign}${hours}時間${mins}分`;
-      return `${sign}${mins}分`;
+      const minuteText = (days > 0 || hours > 0) ? pad2(mins) : String(mins);
+      if (days > 0) return `${sign}${days}日${hours}時間${minuteText}分`;
+      if (hours > 0) return `${sign}${hours}時間${minuteText}分`;
+      return `${sign}${minuteText}分`;
     }
 
     function timeObjectToString(t) {
